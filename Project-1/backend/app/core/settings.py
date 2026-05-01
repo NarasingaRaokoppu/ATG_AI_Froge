@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     # File uploads
     MAX_UPLOAD_MB: int = 20
     UPLOAD_DIR: str = "./uploads"
+    # Base URL at which the backend is publicly reachable (used to build
+    # absolute attachment URLs sent to the LLM vision API)
+    PUBLIC_BASE_URL: str = "http://localhost:8000"
 
     class Config:
         """Pydantic config."""

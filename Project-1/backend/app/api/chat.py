@@ -37,6 +37,7 @@ async def chat(
                 current_user=current_user,
                 message=payload.message,
                 thread_id=payload.thread_id,
+                attachments=payload.attachments,
             ):
                 frame = json.dumps(event, ensure_ascii=False)
                 yield f"data: {frame}\n\n".encode("utf-8")

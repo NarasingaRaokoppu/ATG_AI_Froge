@@ -3,11 +3,22 @@
  */
 
 export type Role = "user" | "assistant";
+export type AttachmentType = "image" | "video" | "table" | "code" | "formula";
+
+export interface MessageAttachment {
+  attachment_type: AttachmentType;
+  attachment_url?: string | null;
+  content?: string | null;
+  name?: string | null;
+  mime_type?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
 
 export interface ChatMessage {
   id: string;
   role: Role;
   content: string;
+  attachments?: MessageAttachment[];
   /** True while this assistant message is still streaming. */
   pending?: boolean;
 }
@@ -29,5 +40,17 @@ export interface MessageDTO {
   thread_id: string;
   role: Role;
   content: string;
+  attachment_type?: string | null;
+  attachment_url?: string | null;
+  attachment_metadata?: Record<string, unknown> | null;
+  attachments?: MessageAttachment[];
   created_at: string;
+}
+
+export interface UploadAttachmentResponse {
+  attachment_type: "image" | "video";
+  attachment_url: string;
+  name: string;
+  mime_type: string;
+  size_bytes: number;
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { messageApi, threadApi } from "../../lib/endpoints";
 import { streamChat } from "../../lib/chatStream";
-import type { ChatMessage, Thread } from "../../types";
+import type { ChatMessage, MessageAttachment, Thread } from "../../types";
 import { InputBar } from "./InputBar";
 import { MessageList } from "./MessageList";
 import { Sidebar } from "./Sidebar";
@@ -61,7 +61,12 @@ export function ChatContainer() {
       const dtos = await messageApi.list(activeThreadId);
       if (cancelled) return;
       setMessages(
-        dtos.map((m) => ({ id: m.id, role: m.role, content: m.content }))
+        dtos.map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          attachments: m.attachments ?? [],
+        }))
       );
     })();
     return () => {
@@ -109,13 +114,17 @@ export function ChatContainer() {
   }, []);
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (payload: { message: string; attachments: MessageAttachment[] }) => {
       if (isStreaming) return;
+
+      const text = payload.message;
+      const attachments = payload.attachments;
 
       const userMsg: ChatMessage = {
         id: newId(),
         role: "user",
         content: text,
+        attachments,
       };
       const assistantId = newId();
       const assistantMsg: ChatMessage = {
@@ -135,6 +144,7 @@ export function ChatContainer() {
         await streamChat({
           message: text,
           threadId: activeThreadId,
+          attachments,
           signal: controller.signal,
           onThread: (threadId) => {
             if (threadId !== activeThreadId) {

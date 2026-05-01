@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 
+import { AttachmentPreview } from "../attachments/AttachmentPreview";
 import type { ChatMessage } from "../../types";
 
 interface MessageBubbleProps {
@@ -27,6 +28,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         ) : (
           <TypingIndicator />
         )}
+
+        {message.attachments && message.attachments.length > 0 ? (
+          <div className="mt-3">
+            <AttachmentPreview attachments={message.attachments} />
+          </div>
+        ) : null}
       </div>
     </div>
   );

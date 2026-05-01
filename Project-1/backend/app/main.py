@@ -3,24 +3,58 @@
 """FastAPI application entry point."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 from app.api import auth as auth_router
 from app.api import chat as chat_router
 from app.api import messages as messages_router
 from app.api import threads as threads_router
+from app.api import upload as upload_router
 from app.core import settings
 from app.db import Base, engine
 from app.models import Message, Thread, User  # noqa: F401  (register mappers)
+
+Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     """Create tables on startup (dev convenience)."""
+    upload_dir = Path(settings.UPLOAD_DIR)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Dev-time compatibility: add new message attachment columns if absent.
+        await conn.execute(
+            text(
+                "ALTER TABLE messages "
+                "ADD COLUMN IF NOT EXISTS attachment_type VARCHAR(32)"
+            )
+        )
+        await conn.execute(
+            text(
+                "ALTER TABLE messages "
+                "ADD COLUMN IF NOT EXISTS attachment_url TEXT"
+            )
+        )
+        await conn.execute(
+            text(
+                "ALTER TABLE messages "
+                "ADD COLUMN IF NOT EXISTS attachment_metadata JSONB"
+            )
+        )
+        await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_messages_thread_created_at "
+                "ON messages (thread_id, created_at)"
+            )
+        )
     yield
 
 
@@ -53,3 +87,7 @@ app.include_router(auth_router.router, prefix="/api")
 app.include_router(threads_router.router, prefix="/api")
 app.include_router(messages_router.router, prefix="/api")
 app.include_router(chat_router.router, prefix="/api")
+app.include_router(upload_router.router, prefix="/api")
+
+# Serve uploaded files directly for inline chat rendering.
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")

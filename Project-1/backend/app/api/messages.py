@@ -22,4 +22,5 @@ async def list_messages(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> list:
     """Return all messages for a thread the user owns."""
-    return await thread_service.get_thread_messages(db, thread_id, current_user.id)
+    messages = await thread_service.get_thread_messages(db, thread_id, current_user.id)
+    return [MessageResponse.from_orm_message(m) for m in messages]

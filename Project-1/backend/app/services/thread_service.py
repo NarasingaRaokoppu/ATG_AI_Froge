@@ -1,5 +1,6 @@
 """Thread + message persistence services."""
 
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -90,10 +91,24 @@ async def get_recent_thread_messages_for_context(
 
 
 async def save_message(
-    db: AsyncSession, *, thread_id: UUID, role: str, content: str
+    db: AsyncSession,
+    *,
+    thread_id: UUID,
+    role: str,
+    content: str,
+    attachment_type: str | None = None,
+    attachment_url: str | None = None,
+    attachment_metadata: dict[str, Any] | None = None,
 ) -> Message:
     """Persist a single message."""
-    message = Message(thread_id=thread_id, role=role, content=content)
+    message = Message(
+        thread_id=thread_id,
+        role=role,
+        content=content,
+        attachment_type=attachment_type,
+        attachment_url=attachment_url,
+        attachment_metadata=attachment_metadata,
+    )
     db.add(message)
     await db.commit()
     await db.refresh(message)

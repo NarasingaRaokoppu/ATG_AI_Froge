@@ -62,6 +62,18 @@ export const api = {
   },
 
   /**
+   * POST multipart/form-data request
+   */
+  async postForm<T>(endpoint: string, body: FormData): Promise<T> {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: "POST",
+      body,
+      credentials: "include",
+    });
+    return handleResponse(response);
+  },
+
+  /**
    * PUT request
    */
   async put<T>(endpoint: string, body?: unknown): Promise<T> {

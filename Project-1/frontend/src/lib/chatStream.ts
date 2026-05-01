@@ -11,9 +11,12 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
+import type { MessageAttachment } from "../types";
+
 export interface StreamChatOptions {
   message: string;
   threadId: string | null;
+  attachments?: MessageAttachment[];
   signal?: AbortSignal;
   onThread: (threadId: string) => void;
   onToken: (token: string) => void;
@@ -22,6 +25,7 @@ export interface StreamChatOptions {
 export async function streamChat({
   message,
   threadId,
+  attachments = [],
   signal,
   onThread,
   onToken,
@@ -32,7 +36,7 @@ export async function streamChat({
       "Content-Type": "application/json",
       Accept: "text/event-stream",
     },
-    body: JSON.stringify({ message, thread_id: threadId }),
+    body: JSON.stringify({ message, thread_id: threadId, attachments }),
     credentials: "include",
     signal,
   });

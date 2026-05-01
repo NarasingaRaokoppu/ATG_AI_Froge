@@ -4,7 +4,12 @@
  */
 
 import { api } from "./api";
-import type { MessageDTO, Thread, User } from "../types";
+import type {
+  MessageDTO,
+  Thread,
+  UploadAttachmentResponse,
+  User,
+} from "../types";
 
 export const authApi = {
   register: (email: string, password: string) =>
@@ -26,4 +31,12 @@ export const threadApi = {
 
 export const messageApi = {
   list: (threadId: string) => api.get<MessageDTO[]>(`/messages/${threadId}`),
+};
+
+export const uploadApi = {
+  uploadFile: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api.postForm<UploadAttachmentResponse>("/upload", form);
+  },
 };
