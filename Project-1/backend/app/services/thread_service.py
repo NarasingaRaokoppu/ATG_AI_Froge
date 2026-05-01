@@ -67,13 +67,49 @@ async def save_message(
     return message
 
 
+async def rename_thread(
+    db: AsyncSession, *, thread_id: UUID, user_id: UUID, title: str
+) -> Thread:
+    """Rename a thread owned by the user."""
+    thread = await get_thread_for_user(db, thread_id, user_id)
+    thread.title = title
+    db.add(thread)
+    await db.commit()
+    await db.refresh(thread)
+    return thread
+
+
 async def maybe_set_title(
-    db: AsyncSession, thread: Thread, fallback_text: str
+    db: AsyncSession,
+    thread: Thread,
+    fallback_text: str,
+    *,
+    user_email: str = "system",
 ) -> None:
-    """Auto-generate a thread title from the first message if missing."""
+    """Auto-generate a thread title via LLM from the first message if missing."""
     if thread.title:
         return
-    title = fallback_text.strip().splitlines()[0][:80]
+
+    # Import lazily to avoid circular dependency at module load time
+    from app.ai.chains.title_chain import title_chain  # noqa: PLC0415
+    from app.core import settings  # noqa: PLC0415
+
+    try:
+        title = await title_chain.ainvoke(
+            {"message": fallback_text[:500]},
+            config={
+                "metadata": {
+                    "user_email": user_email,
+                    "application": settings.APP_NAME,
+                    "environment": settings.ENVIRONMENT,
+                }
+            },
+        )
+        title = str(title).strip()[:255] or fallback_text.strip().splitlines()[0][:80]
+    except Exception:  # noqa: BLE001
+        # Fall back to rule-based title on any LLM error
+        title = fallback_text.strip().splitlines()[0][:80]
+
     if not title:
         return
     thread.title = title

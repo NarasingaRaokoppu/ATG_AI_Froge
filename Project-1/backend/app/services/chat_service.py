@@ -37,7 +37,9 @@ async def stream_chat_response(
     await thread_service.save_message(
         db, thread_id=thread.id, role="user", content=message
     )
-    await thread_service.maybe_set_title(db, thread, fallback_text=message)
+    await thread_service.maybe_set_title(
+        db, thread, fallback_text=message, user_email=current_user.email
+    )
 
     yield {"event": "thread", "thread_id": str(thread.id)}
 

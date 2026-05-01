@@ -77,6 +77,21 @@ export const api = {
   },
 
   /**
+   * PATCH request
+   */
+  async patch<T>(endpoint: string, body?: unknown): Promise<T> {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      credentials: "include",
+    });
+    return handleResponse(response);
+  },
+
+  /**
    * DELETE request
    */
   async delete<T>(endpoint: string): Promise<T> {

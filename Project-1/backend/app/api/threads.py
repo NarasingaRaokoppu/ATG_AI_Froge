@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import get_current_user
 from app.db import get_db
 from app.models import User
-from app.schemas.thread import ThreadCreate, ThreadResponse
+from app.schemas.thread import ThreadCreate, ThreadResponse, ThreadUpdate
 from app.services import thread_service
 
 router = APIRouter(prefix="/threads", tags=["threads"])
@@ -37,6 +37,19 @@ async def create_thread(
     """Create a new empty thread."""
     return await thread_service.create_thread(
         db, user_id=current_user.id, title=payload.title
+    )
+
+
+@router.patch("/{thread_id}", response_model=ThreadResponse)
+async def rename_thread(
+    thread_id: UUID,
+    payload: ThreadUpdate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Rename a thread."""
+    return await thread_service.rename_thread(
+        db, thread_id=thread_id, user_id=current_user.id, title=payload.title
     )
 
 
