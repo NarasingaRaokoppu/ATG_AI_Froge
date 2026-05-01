@@ -26,9 +26,9 @@ export function InputBar({ disabled, onSend }: InputBarProps) {
   return (
     <form
       onSubmit={submit}
-      className="border-t border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"
+      className="border-t border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900 sm:p-4"
     >
-      <div className="mx-auto flex max-w-3xl items-end gap-2">
+      <div className="mx-auto flex w-full max-w-4xl items-end gap-2">
         <textarea
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -41,7 +41,7 @@ export function InputBar({ disabled, onSend }: InputBarProps) {
         <button
           type="submit"
           disabled={disabled || value.trim().length === 0}
-          className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+          className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400 sm:px-5"
         >
           Send
         </button>

@@ -18,7 +18,12 @@ _SYSTEM_PROMPT = (_PROMPT_DIR / "chat_system.txt").read_text(encoding="utf-8")
 chat_prompt = ChatPromptTemplate.from_messages(
     [
         ("system", _SYSTEM_PROMPT),
-        ("human", "{message}"),
+        (
+            "human",
+            "Previous conversation:\n\n{history}\n\n"
+            "Now answer the next question:\n"
+            "User: {message}",
+        ),
     ]
 )
 

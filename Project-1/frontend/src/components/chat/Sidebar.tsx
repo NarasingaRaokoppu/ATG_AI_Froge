@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { type MouseEvent, useRef, useState } from "react";
 
 import type { Thread } from "../../types";
 import { useAuthStore } from "../../lib/authStore";
@@ -29,7 +29,7 @@ export function Sidebar({
   const editRef = useRef<HTMLInputElement>(null);
 
   return (
-    <aside className="flex h-full w-72 flex-col border-r border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
+    <aside className="flex h-full w-72 max-w-full flex-col border-r border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
       <div className="border-b border-gray-200 p-3 dark:border-gray-800">
         <button
           type="button"
@@ -47,7 +47,7 @@ export function Sidebar({
           </p>
         ) : threads.length === 0 ? (
           <p className="px-2 py-3 text-xs text-gray-500 dark:text-gray-400">
-            No conversations yet.
+            Start a new conversation.
           </p>
         ) : (
           <ul className="space-y-1">
@@ -55,7 +55,7 @@ export function Sidebar({
               const isActive = t.id === activeThreadId;
               const isEditing = editingId === t.id;
 
-              const startEdit = (e: React.MouseEvent) => {
+              const startEdit = (e: MouseEvent) => {
                 e.stopPropagation();
                 setEditingId(t.id);
                 setEditValue(t.title ?? "");
@@ -102,7 +102,7 @@ export function Sidebar({
                   )}
 
                   {!isEditing && (
-                    <div className="absolute right-1 top-1 hidden flex-col gap-0.5 group-hover:flex">
+                    <div className="absolute right-1 top-1 flex flex-col gap-0.5 opacity-100 transition lg:opacity-0 lg:group-hover:opacity-100">
                       <button
                         type="button"
                         aria-label="Rename thread"

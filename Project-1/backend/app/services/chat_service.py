@@ -11,6 +11,18 @@ from app.models import User
 from app.services import thread_service
 
 
+def _format_memory_context(messages: list) -> str:
+    """Format up to the last 10 messages as prompt memory context."""
+    if not messages:
+        return "(no previous conversation)"
+
+    lines: list[str] = []
+    for msg in messages:
+        role = "User" if msg.role == "user" else "Assistant"
+        lines.append(f"{role}: {msg.content}")
+    return "\n".join(lines)
+
+
 async def stream_chat_response(
     db: AsyncSession,
     *,
@@ -33,6 +45,15 @@ async def stream_chat_response(
             db, thread_id, current_user.id
         )
 
+    # 1b. Load thread-scoped memory (last 10 messages = last 5 turns)
+    recent_messages = await thread_service.get_recent_thread_messages_for_context(
+        db,
+        thread_id=thread.id,
+        user_id=current_user.id,
+        limit=10,
+    )
+    history = _format_memory_context(recent_messages)
+
     # 2. Persist the user message + auto-title
     await thread_service.save_message(
         db, thread_id=thread.id, role="user", content=message
@@ -53,7 +74,10 @@ async def stream_chat_response(
     }
 
     chunks: list[str] = []
-    async for token in chat_chain.astream({"message": message}, config=config):
+    async for token in chat_chain.astream(
+        {"history": history, "message": message},
+        config=config,
+    ):
         if not token:
             continue
         chunks.append(token)

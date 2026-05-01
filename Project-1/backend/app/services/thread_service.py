@@ -3,7 +3,7 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Message, Thread
@@ -21,11 +21,24 @@ async def create_thread(
 
 
 async def get_user_threads(db: AsyncSession, user_id: UUID) -> list[Thread]:
-    """Return all threads for a user, newest first."""
+    """Return all threads for a user, newest activity first."""
+    activity_sq = (
+        select(
+            Message.thread_id.label("thread_id"),
+            func.max(Message.created_at).label("last_message_at"),
+        )
+        .group_by(Message.thread_id)
+        .subquery()
+    )
+
     result = await db.scalars(
         select(Thread)
+        .outerjoin(activity_sq, activity_sq.c.thread_id == Thread.id)
         .where(Thread.user_id == user_id)
-        .order_by(Thread.created_at.desc())
+        .order_by(
+            func.coalesce(activity_sq.c.last_message_at, Thread.created_at).desc(),
+            Thread.created_at.desc(),
+        )
     )
     return list(result)
 
@@ -56,6 +69,26 @@ async def get_thread_messages(
     return list(result)
 
 
+async def get_recent_thread_messages_for_context(
+    db: AsyncSession,
+    *,
+    thread_id: UUID,
+    user_id: UUID,
+    limit: int = 10,
+) -> list[Message]:
+    """Return the most recent messages for context (chronological order)."""
+    await get_thread_for_user(db, thread_id, user_id)
+    result = await db.scalars(
+        select(Message)
+        .where(Message.thread_id == thread_id)
+        .order_by(Message.created_at.desc())
+        .limit(limit)
+    )
+    recent = list(result)
+    recent.reverse()
+    return recent
+
+
 async def save_message(
     db: AsyncSession, *, thread_id: UUID, role: str, content: str
 ) -> Message:
@@ -77,6 +110,13 @@ async def rename_thread(
     await db.commit()
     await db.refresh(thread)
     return thread
+
+
+async def delete_thread(db: AsyncSession, *, thread_id: UUID, user_id: UUID) -> None:
+    """Delete a thread and its messages after ownership validation."""
+    thread = await get_thread_for_user(db, thread_id, user_id)
+    await db.delete(thread)
+    await db.commit()
 
 
 async def maybe_set_title(

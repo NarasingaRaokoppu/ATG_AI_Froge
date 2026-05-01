@@ -16,19 +16,25 @@ export function ChatContainer() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(true);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const justCreatedRef = useRef(false);
+
+  const refreshThreads = useCallback(async () => {
+    const list = await threadApi.list();
+    setThreads(list);
+    return list;
+  }, []);
 
   // Initial thread load
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const list = await threadApi.list();
+        const list = await refreshThreads();
         if (cancelled) return;
-        setThreads(list);
         if (list.length > 0) setActiveThreadId(list[0].id);
       } finally {
         if (!cancelled) setThreadsLoading(false);
@@ -37,7 +43,7 @@ export function ChatContainer() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshThreads]);
 
   // Load messages whenever the active thread changes
   useEffect(() => {
@@ -67,12 +73,14 @@ export function ChatContainer() {
     if (isStreaming) return;
     setActiveThreadId(null);
     setMessages([]);
+    setSidebarOpen(false);
   }, [isStreaming]);
 
   const handleSelect = useCallback(
     (id: string | null) => {
       if (isStreaming) return;
       setActiveThreadId(id);
+      setSidebarOpen(false);
     },
     [isStreaming]
   );
@@ -80,10 +88,16 @@ export function ChatContainer() {
   const handleDelete = useCallback(
     async (id: string) => {
       await threadApi.remove(id);
-      setThreads((prev) => prev.filter((t) => t.id !== id));
+      let nextThreads: Thread[] = [];
+      setThreads((prev) => {
+        nextThreads = prev.filter((t) => t.id !== id);
+        return nextThreads;
+      });
+
       if (activeThreadId === id) {
-        setActiveThreadId(null);
-        setMessages([]);
+        const fallback = nextThreads[0]?.id ?? null;
+        setActiveThreadId(fallback);
+        if (!fallback) setMessages([]);
       }
     },
     [activeThreadId]
@@ -117,8 +131,6 @@ export function ChatContainer() {
       const controller = new AbortController();
       abortRef.current = controller;
 
-      let createdThreadId: string | null = null;
-
       try {
         await streamChat({
           message: text,
@@ -126,7 +138,6 @@ export function ChatContainer() {
           signal: controller.signal,
           onThread: (threadId) => {
             if (threadId !== activeThreadId) {
-              createdThreadId = threadId;
               justCreatedRef.current = true;
               setActiveThreadId(threadId);
             }
@@ -142,15 +153,8 @@ export function ChatContainer() {
           },
         });
 
-        // Refresh sidebar so the new thread + auto-title appear
-        if (createdThreadId || !activeThreadId) {
-          const list = await threadApi.list();
-          setThreads(list);
-        } else {
-          // title may have just been set on first message
-          const list = await threadApi.list();
-          setThreads(list);
-        }
+        // Refresh sidebar so new threads and latest auto-title are reflected.
+        await refreshThreads();
       } catch (err) {
         const errorText =
           err instanceof Error ? err.message : "Something went wrong.";
@@ -174,33 +178,77 @@ export function ChatContainer() {
         abortRef.current = null;
       }
     },
-    [activeThreadId, isStreaming]
+    [activeThreadId, isStreaming, refreshThreads]
   );
 
-  return (
-    <div className="flex h-screen bg-white dark:bg-gray-950">
-      <Sidebar
-        threads={threads}
-        activeThreadId={activeThreadId}
-        onSelect={handleSelect}
-        onNewChat={handleNewChat}
-        onDelete={handleDelete}
-        onRename={handleRename}
-        loading={threadsLoading}
-      />
+  const activeThread = threads.find((t) => t.id === activeThreadId) ?? null;
 
-      <div className="flex flex-1 flex-col">
-        <header className="border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-800 dark:bg-gray-900">
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+  return (
+    <div className="flex h-dvh bg-white dark:bg-gray-950">
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <button
+            type="button"
+            aria-label="Close sidebar"
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setSidebarOpen(false)}
+          />
+          <div className="absolute left-0 top-0 h-full w-[82vw] max-w-xs">
+            <Sidebar
+              threads={threads}
+              activeThreadId={activeThreadId}
+              onSelect={handleSelect}
+              onNewChat={handleNewChat}
+              onDelete={handleDelete}
+              onRename={handleRename}
+              loading={threadsLoading}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="hidden lg:flex">
+        <Sidebar
+          threads={threads}
+          activeThreadId={activeThreadId}
+          onSelect={handleSelect}
+          onNewChat={handleNewChat}
+          onDelete={handleDelete}
+          onRename={handleRename}
+          loading={threadsLoading}
+        />
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900 sm:px-6 sm:py-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800 lg:hidden"
+              aria-label="Open threads"
+            >
+              ≡
+            </button>
+
+            <div>
+              <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Amzur AI Chat
+              </h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {activeThread?.title || "New conversation"}
+              </p>
+            </div>
+          </div>
+
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             Amzur AI Chat
-          </h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
             Gemini · via LiteLLM proxy
           </p>
         </header>
 
-        <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-hidden">
-          <MessageList messages={messages} />
+        <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-hidden px-2 sm:px-4">
+          <MessageList messages={messages} isStreaming={isStreaming} />
         </main>
 
         <InputBar disabled={isStreaming} onSend={sendMessage} />

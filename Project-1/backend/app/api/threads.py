@@ -60,6 +60,8 @@ async def delete_thread(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     """Delete a thread (and its messages)."""
-    thread = await thread_service.get_thread_for_user(db, thread_id, current_user.id)
-    await db.delete(thread)
-    await db.commit()
+    await thread_service.delete_thread(
+        db,
+        thread_id=thread_id,
+        user_id=current_user.id,
+    )
