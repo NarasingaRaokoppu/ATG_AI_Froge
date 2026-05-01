@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# FastAPI
+.fastapi_cache/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads and ChromaDB
+uploads/
+chroma_db/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

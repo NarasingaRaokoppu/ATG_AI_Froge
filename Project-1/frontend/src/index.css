@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+	body {
+		@apply bg-slate-100 text-slate-950 antialiased dark:bg-slate-950 dark:text-slate-50;
+	}
+}
+
+@layer components {
+	.auth-shell {
+		background:
+			radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 34%),
+			radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.12), transparent 28%),
+			linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+		position: relative;
+		overflow: hidden;
+	}
+
+	.dark .auth-shell {
+		background:
+			radial-gradient(circle at top left, rgba(37, 99, 235, 0.22), transparent 34%),
+			radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.18), transparent 28%),
+			linear-gradient(180deg, #020617 0%, #0f172a 100%);
+	}
+
+	.auth-shell::before,
+	.auth-shell::after {
+		border-radius: 9999px;
+		content: "";
+		position: absolute;
+		filter: blur(24px);
+		opacity: 0.75;
+	}
+
+	.auth-shell::before {
+		background: rgba(59, 130, 246, 0.18);
+		height: 18rem;
+		left: -4rem;
+		top: -5rem;
+		width: 18rem;
+	}
+
+	.auth-shell::after {
+		background: rgba(56, 189, 248, 0.14);
+		bottom: -6rem;
+		height: 20rem;
+		right: -5rem;
+		width: 20rem;
+	}
+
+	.auth-card {
+		backdrop-filter: blur(12px);
+	}
+
+	.auth-fade-in {
+		animation: auth-fade-in 320ms ease-out;
+	}
+
+	.auth-spinner {
+		animation: auth-spin 0.8s linear infinite;
+		border: 2px solid rgba(255, 255, 255, 0.35);
+		border-top-color: #ffffff;
+		border-radius: 9999px;
+		display: inline-block;
+		height: 1rem;
+		width: 1rem;
+	}
+}
+
+@keyframes auth-fade-in {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes auth-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}

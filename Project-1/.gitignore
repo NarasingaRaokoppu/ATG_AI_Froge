@@ -1,0 +1,12 @@
+# Project root .gitignore
+.env
+.env.local
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# OS
+*.log
