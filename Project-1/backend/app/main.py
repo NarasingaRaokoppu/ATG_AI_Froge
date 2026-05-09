@@ -19,14 +19,23 @@ from app.core import settings
 from app.db import Base, engine
 from app.models import Message, Thread, User  # noqa: F401  (register mappers)
 
-Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+
+def _resolve_upload_dir() -> Path:
+    configured = Path(settings.UPLOAD_DIR)
+    if configured.is_absolute():
+        return configured
+    backend_root = Path(__file__).resolve().parents[1]
+    return (backend_root / configured).resolve()
+
+
+UPLOAD_DIR_PATH = _resolve_upload_dir()
+UPLOAD_DIR_PATH.mkdir(parents=True, exist_ok=True)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     """Create tables on startup (dev convenience)."""
-    upload_dir = Path(settings.UPLOAD_DIR)
-    upload_dir.mkdir(parents=True, exist_ok=True)
+    UPLOAD_DIR_PATH.mkdir(parents=True, exist_ok=True)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -90,4 +99,4 @@ app.include_router(chat_router.router, prefix="/api")
 app.include_router(upload_router.router, prefix="/api")
 
 # Serve uploaded files directly for inline chat rendering.
-app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR_PATH)), name="uploads")

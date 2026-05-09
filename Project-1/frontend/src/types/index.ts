@@ -3,7 +3,7 @@
  */
 
 export type Role = "user" | "assistant";
-export type AttachmentType = "image" | "video" | "table" | "code" | "formula";
+export type AttachmentType = "image" | "video" | "video_frame" | "table" | "code" | "formula" | "excel" | "docx" | "txt";
 
 export interface MessageAttachment {
   attachment_type: AttachmentType;
@@ -48,9 +48,11 @@ export interface MessageDTO {
 }
 
 export interface UploadAttachmentResponse {
-  attachment_type: "image" | "video";
+  attachment_type: "image" | "video" | "excel" | "docx" | "txt";
   attachment_url: string;
   name: string;
   mime_type: string;
   size_bytes: number;
+  content?: string | null;
+  video_frames?: string[] | null;
 }

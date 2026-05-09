@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import { uploadApi } from "../../lib/endpoints";
+import { APIError } from "../../lib/api";
 import type { MessageAttachment } from "../../types";
 
 const MAX_MB = 20;
@@ -20,6 +21,9 @@ const ATTACHMENT_EMOJI: Record<string, string> = {
   code: "💻",
   table: "📊",
   formula: "∫",
+  excel: "📈",
+  docx: "📄",
+  txt: "📝",
 };
 
 interface InputBarProps {
@@ -101,17 +105,33 @@ export function InputBar({ disabled, onSend }: InputBarProps) {
       const uploaded: MessageAttachment[] = [];
       for (const file of Array.from(files)) {
         const result = await uploadApi.uploadFile(file);
+        const metadata: Record<string, unknown> = { size_bytes: result.size_bytes };
+        
+        // Add video frames to metadata if available
+        if (result.video_frames && result.video_frames.length > 0) {
+          metadata.video_frames = result.video_frames;
+        }
+        
         uploaded.push({
           attachment_type: result.attachment_type,
           attachment_url: result.attachment_url,
+          content: result.content || undefined,
           name: result.name,
           mime_type: result.mime_type,
-          metadata: { size_bytes: result.size_bytes },
+          metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         });
       }
       setAttachments((prev) => [...prev, ...uploaded]);
-    } catch {
-      setUploadError("Upload failed. Please try again.");
+    } catch (error) {
+      if (error instanceof APIError) {
+        const detail =
+          typeof error.detail === "string"
+            ? error.detail
+            : JSON.stringify(error.detail);
+        setUploadError(`Upload failed: ${detail}`);
+      } else {
+        setUploadError("Upload failed. Please try again.");
+      }
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -237,13 +257,13 @@ export function InputBar({ disabled, onSend }: InputBarProps) {
             {menuOpen && (
               <div className="absolute bottom-12 left-0 z-20 min-w-[170px] rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800">
                 <label className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700">
-                  <span>📎</span> Image / Video
+                  <span>📎</span> Files
                   <input
                     ref={fileInputRef}
                     type="file"
                     className="hidden"
                     multiple
-                    accept="image/png,image/jpeg,image/webp,video/mp4,video/quicktime"
+                    accept="image/png,image/jpeg,image/webp,video/mp4,video/quicktime,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.ms-excel.sheet.macroEnabled.12,text/csv,.csv,.xlsx,.xls,.xlsm,.xlsb,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,.docx,.doc,text/plain,.txt"
                     onChange={(e) => { setMenuOpen(false); void handleFileSelect(e.target.files); }}
                   />
                 </label>

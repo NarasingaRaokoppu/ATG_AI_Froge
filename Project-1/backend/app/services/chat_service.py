@@ -76,7 +76,7 @@ def _build_multimodal_messages(
         }
     )
 
-    # Attachment blocks — images as image_url (base64), others as text
+    # Attachment blocks — images as image_url (base64), video frames as images, others as text
     for att in attachments:
         if att.attachment_type == "image":
             data_uri = _url_to_b64_data_uri(att.attachment_url)
@@ -89,17 +89,42 @@ def _build_multimodal_messages(
                 content.append({"type": "text", "text": f"\n[Image attached: {name} — file not found on disk]"})
 
         elif att.attachment_type == "video":
-            name = att.name or att.attachment_url or "uploaded video"
-            content.append(
-                {
-                    "type": "text",
-                    "text": (
-                        f"\n[Video attached: {name}. "
-                        "You cannot play video, so acknowledge it and offer help "
-                        "if the user describes what is in it.]"
-                    ),
-                }
-            )
+            # If video frames are available (extracted from video), send them as images
+            if att.metadata and isinstance(att.metadata.get("video_frames"), list):
+                frames = att.metadata.get("video_frames", [])
+                for frame_b64 in frames:
+                    if isinstance(frame_b64, str) and frame_b64.startswith("data:"):
+                        content.append(
+                            {"type": "image_url", "image_url": {"url": frame_b64}}
+                        )
+                name = att.name or att.attachment_url or "uploaded video"
+                content.append(
+                    {
+                        "type": "text",
+                        "text": f"\n[Video frames above extracted from: {name}. Analyze the frames and describe what you see in the video.]",
+                    }
+                )
+            else:
+                # Fallback if no frames
+                name = att.name or att.attachment_url or "uploaded video"
+                content.append(
+                    {
+                        "type": "text",
+                        "text": (
+                            f"\n[Video attached: {name}. "
+                            "You cannot play video directly, but key frames have been extracted. "
+                            "Analyze the frames or ask the user to describe the video.]"
+                        ),
+                    }
+                )
+
+        elif att.attachment_type == "video_frame":
+            # Extracted video frame as image
+            if att.content and att.content.startswith("data:"):
+                content.append(
+                    {"type": "image_url", "image_url": {"url": att.content}}
+                )
+
         elif att.attachment_type == "code":
             lang = (Path(att.name or "").suffix.lstrip(".")) if att.name else ""
             content.append(
@@ -113,6 +138,27 @@ def _build_multimodal_messages(
                 {
                     "type": "text",
                     "text": f"\n[{att.attachment_type.capitalize()}: {att.name or ''}]\n{att.content or ''}",
+                }
+            )
+        elif att.attachment_type == "txt":
+            content.append(
+                {
+                    "type": "text",
+                    "text": f"\n[Text file: {att.name or 'document'}]\n{att.content or ''}",
+                }
+            )
+        elif att.attachment_type == "excel":
+            content.append(
+                {
+                    "type": "text",
+                    "text": f"\n[Excel file: {att.name or 'spreadsheet'}]\n{att.content or ''}",
+                }
+            )
+        elif att.attachment_type == "docx":
+            content.append(
+                {
+                    "type": "text",
+                    "text": f"\n[Word document: {att.name or 'document'}]\n{att.content or ''}",
                 }
             )
 
@@ -148,11 +194,18 @@ def _format_attachments_context(attachments: list[ChatAttachment]) -> str:
                 f"and offer to help if the user describes the contents.)"
             )
         elif attachment.attachment_type == "video":
-            lines.append(
-                f"- Video file attached: {name}\n"
-                f"  (You cannot play this video directly. Acknowledge its presence "
-                f"and offer to help if the user describes what is in the video.)"
-            )
+            if attachment.metadata and isinstance(attachment.metadata.get("video_frames"), list):
+                lines.append(
+                    f"- Video file attached: {name}\n"
+                    f"  (Key frames have been extracted. Analyze the frames above.)"
+                )
+            else:
+                lines.append(
+                    f"- Video file attached: {name}\n"
+                    f"  (You cannot play this video directly. Ask user to describe what is in it.)"
+                )
+        elif attachment.attachment_type == "video_frame":
+            lines.append(f"- Video frame: {name}")
         elif attachment.attachment_type == "code":
             body = attachment.content or ""
             lang_hint = name.rsplit(".", 1)[-1] if "." in name else ""
@@ -163,6 +216,18 @@ def _format_attachments_context(attachments: list[ChatAttachment]) -> str:
         elif attachment.attachment_type == "formula":
             body = attachment.content or ""
             lines.append(f"- Formula:\n{body}")
+        elif attachment.attachment_type == "txt":
+            body = attachment.content or ""
+            preview = body[:200] + "..." if len(body) > 200 else body
+            lines.append(f"- Text file ({name}):\n{preview}")
+        elif attachment.attachment_type == "excel":
+            body = attachment.content or ""
+            preview = body[:200] + "..." if len(body) > 200 else body
+            lines.append(f"- Excel file ({name}):\n{preview}")
+        elif attachment.attachment_type == "docx":
+            body = attachment.content or ""
+            preview = body[:200] + "..." if len(body) > 200 else body
+            lines.append(f"- Word document ({name}):\n{preview}")
         else:
             lines.append(f"- {label} ({name}): {attachment.content or ''}")
 
@@ -242,7 +307,11 @@ async def stream_chat_response(
         }
     }
 
-    has_images = any(a.attachment_type == "image" for a in attachments)
+    has_images = any(
+        a.attachment_type in ("image", "video_frame") or 
+        (a.attachment_type == "video" and a.metadata and isinstance(a.metadata.get("video_frames"), list))
+        for a in attachments
+    )
 
     chunks: list[str] = []
 

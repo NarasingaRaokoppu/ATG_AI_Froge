@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-AttachmentType = Literal["image", "video"]
+AttachmentType = Literal["image", "video", "excel", "docx", "txt"]
 
 
 class UploadResponse(BaseModel):
@@ -15,3 +15,5 @@ class UploadResponse(BaseModel):
     name: str
     mime_type: str
     size_bytes: int
+    content: str | None = None  # For text-based files (txt, excel, docx)
+    video_frames: list[str] | None = None  # Base64 data URIs for extracted video frames

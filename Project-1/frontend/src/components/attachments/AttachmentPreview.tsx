@@ -64,9 +64,13 @@ function renderTable(raw: string) {
 const TYPE_LABEL: Record<string, string> = {
   image: "🖼️ Image",
   video: "🎥 Video",
+  video_frame: "🎬 Frame",
   code: "💻 Code",
   table: "📊 Table",
   formula: "∫ Formula",
+  excel: "📈 Excel",
+  docx: "📄 Document",
+  txt: "📝 Text",
 };
 
 export function AttachmentPreview({ attachments, onRemove }: AttachmentPreviewProps) {
@@ -131,6 +135,50 @@ export function AttachmentPreview({ attachments, onRemove }: AttachmentPreviewPr
               <pre className="mt-0.5 rounded-md bg-gray-100 p-2 text-xs dark:bg-gray-800">
                 {a.content || ""}
               </pre>
+            ) : null}
+
+            {a.attachment_type === "txt" ? (
+              <pre className="mt-0.5 max-h-44 overflow-auto rounded-md bg-gray-100 p-2 text-xs dark:bg-gray-800">
+                {a.content ? a.content.substring(0, 500) : ""}
+                {a.content && a.content.length > 500 ? "\n...(truncated)" : ""}
+              </pre>
+            ) : null}
+
+            {a.attachment_type === "excel" ? (
+              <pre className="mt-0.5 max-h-44 overflow-auto rounded-md bg-gray-100 p-2 text-xs dark:bg-gray-800">
+                {a.content ? a.content.substring(0, 500) : ""}
+                {a.content && a.content.length > 500 ? "\n...(truncated)" : ""}
+              </pre>
+            ) : null}
+
+            {a.attachment_type === "docx" ? (
+              <pre className="mt-0.5 max-h-44 overflow-auto rounded-md bg-gray-100 p-2 text-xs dark:bg-gray-800">
+                {a.content ? a.content.substring(0, 500) : ""}
+                {a.content && a.content.length > 500 ? "\n...(truncated)" : ""}
+              </pre>
+            ) : null}
+
+            {a.attachment_type === "video_frame" && a.content ? (
+              <img
+                src={a.content}
+                loading="lazy"
+                alt="Video frame"
+                className="mt-0.5 h-36 w-full rounded-md object-cover"
+              />
+            ) : null}
+
+            {a.attachment_type === "video" && a.metadata && Array.isArray(a.metadata.video_frames) ? (
+              <div className="mt-0.5 flex gap-1 overflow-x-auto">
+                {(a.metadata.video_frames as string[]).map((frame, idx) => (
+                  <img
+                    key={idx}
+                    src={frame}
+                    loading="lazy"
+                    alt={`Video frame ${idx + 1}`}
+                    className="h-32 w-32 flex-shrink-0 rounded-md object-cover"
+                  />
+                ))}
+              </div>
             ) : null}
           </div>
         );

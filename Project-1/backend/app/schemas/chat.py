@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
-AttachmentType = Literal["image", "video", "table", "code", "formula"]
+AttachmentType = Literal["image", "video", "video_frame", "table", "code", "formula", "excel", "docx", "txt"]
 
 
 class ChatAttachment(BaseModel):
