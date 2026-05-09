@@ -1,34 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { imageApi, messageApi, threadApi } from "../../lib/endpoints";
-import { streamChat } from "../../lib/chatStream";
-import type {
-  ChatMessage,
-  GeneratedImage,
-  MessageAttachment,
-  Thread,
-} from "../../types";
+import { threadApi } from "../../lib/endpoints";
+import type { Thread } from "../../types";
+import { useChatActions } from "../../hooks/useChatActions";
+import { useThreadMessages } from "../../hooks/useThreadMessages";
 import { InputBar } from "./InputBar";
-import { ImageGenerationPanel } from "../images/ImageGenerationPanel";
+import { ChatHeader } from "./ChatHeader";
+import { EmptyState } from "./EmptyState";
 import { MessageList } from "./MessageList";
 import { Sidebar } from "./Sidebar";
-
-const newId = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2);
 
 export function ChatContainer() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(true);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
-  const [imagesLoading, setImagesLoading] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
-  const justCreatedRef = useRef(false);
 
   const refreshThreads = useCallback(async () => {
     const list = await threadApi.list();
@@ -36,7 +22,6 @@ export function ChatContainer() {
     return list;
   }, []);
 
-  // Initial thread load
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -48,65 +33,52 @@ export function ChatContainer() {
         if (!cancelled) setThreadsLoading(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
   }, [refreshThreads]);
 
-  // Load messages whenever the active thread changes
-  useEffect(() => {
-    if (!activeThreadId) {
-      setMessages([]);
-      setGeneratedImages([]);
-      setImagesLoading(false);
-      return;
-    }
-    if (justCreatedRef.current) {
-      // Thread was just created in-flight; do not wipe streaming state.
-      justCreatedRef.current = false;
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      const dtos = await messageApi.list(activeThreadId);
-      if (cancelled) return;
-      setMessages(
-        dtos.map((m) => ({
-          id: m.id,
-          role: m.role,
-          content: m.content,
-          attachments: m.attachments ?? [],
-        }))
-      );
+  const {
+    timelineMessages,
+    ragDocuments,
+    refreshGeneratedImages,
+    refreshRagDocuments,
+    appendBaseMessage,
+    patchBaseMessage,
+    newId,
+  } = useThreadMessages(activeThreadId);
 
-      setImagesLoading(true);
-      try {
-        const imageList = await imageApi.listByThread(activeThreadId);
-        if (!cancelled) setGeneratedImages(imageList);
-      } finally {
-        if (!cancelled) setImagesLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeThreadId]);
+  const { isBusy, handleSendMessage, handleImageGeneration, handlePdfUpload } =
+    useChatActions({
+      activeThreadId,
+      ragDocuments,
+      setActiveThreadId,
+      refreshThreads,
+      refreshGeneratedImages,
+      refreshRagDocuments,
+      appendBaseMessage,
+      patchBaseMessage,
+      newId,
+    });
 
   const handleNewChat = useCallback(() => {
-    if (isStreaming) return;
+    if (isBusy) return;
     setActiveThreadId(null);
-    setMessages([]);
-    setGeneratedImages([]);
     setSidebarOpen(false);
-  }, [isStreaming]);
+  }, [isBusy]);
 
   const handleSelect = useCallback(
     (id: string | null) => {
-      if (isStreaming) return;
+      if (isBusy) return;
+      console.debug("[ChatContainer] thread switch", {
+        from: activeThreadId,
+        to: id,
+      });
       setActiveThreadId(id);
       setSidebarOpen(false);
     },
-    [isStreaming]
+    [activeThreadId, isBusy]
   );
 
   const handleDelete = useCallback(
@@ -119,9 +91,7 @@ export function ChatContainer() {
       });
 
       if (activeThreadId === id) {
-        const fallback = nextThreads[0]?.id ?? null;
-        setActiveThreadId(fallback);
-        if (!fallback) setMessages([]);
+        setActiveThreadId(nextThreads[0]?.id ?? null);
       }
     },
     [activeThreadId]
@@ -132,89 +102,11 @@ export function ChatContainer() {
     setThreads((prev) => prev.map((t) => (t.id === id ? updated : t)));
   }, []);
 
-  const sendMessage = useCallback(
-    async (payload: { message: string; attachments: MessageAttachment[] }) => {
-      if (isStreaming) return;
-
-      const text = payload.message;
-      const attachments = payload.attachments;
-
-      const userMsg: ChatMessage = {
-        id: newId(),
-        role: "user",
-        content: text,
-        attachments,
-      };
-      const assistantId = newId();
-      const assistantMsg: ChatMessage = {
-        id: assistantId,
-        role: "assistant",
-        content: "",
-        pending: true,
-      };
-
-      setMessages((prev) => [...prev, userMsg, assistantMsg]);
-      setIsStreaming(true);
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      try {
-        await streamChat({
-          message: text,
-          threadId: activeThreadId,
-          attachments,
-          signal: controller.signal,
-          onThread: (threadId) => {
-            if (threadId !== activeThreadId) {
-              justCreatedRef.current = true;
-              setActiveThreadId(threadId);
-            }
-          },
-          onToken: (token) => {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId
-                  ? { ...m, content: m.content + token }
-                  : m
-              )
-            );
-          },
-        });
-
-        // Refresh sidebar so new threads and latest auto-title are reflected.
-        await refreshThreads();
-      } catch (err) {
-        const errorText =
-          err instanceof Error ? err.message : "Something went wrong.";
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId
-              ? {
-                  ...m,
-                  content: m.content || `**Error:** ${errorText}`,
-                }
-              : m
-          )
-        );
-      } finally {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId ? { ...m, pending: false } : m
-          )
-        );
-        setIsStreaming(false);
-        abortRef.current = null;
-      }
-    },
-    [activeThreadId, isStreaming, refreshThreads]
-  );
-
   const activeThread = threads.find((t) => t.id === activeThreadId) ?? null;
 
   return (
     <div className="flex h-dvh bg-white dark:bg-gray-950">
-      {sidebarOpen && (
+      {sidebarOpen ? (
         <div className="fixed inset-0 z-40 lg:hidden">
           <button
             type="button"
@@ -234,7 +126,7 @@ export function ChatContainer() {
             />
           </div>
         </div>
-      )}
+      ) : null}
 
       <div className="hidden lg:flex">
         <Sidebar
@@ -249,49 +141,37 @@ export function ChatContainer() {
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900 sm:px-6 sm:py-4">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setSidebarOpen(true)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800 lg:hidden"
-              aria-label="Open threads"
-            >
-              ≡
-            </button>
-
-            <div>
-              <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                Amzur AI Chat
-              </h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {activeThread?.title || "New conversation"}
-              </p>
-            </div>
-          </div>
-
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Amzur AI Chat
-            Gemini · via LiteLLM proxy
-          </p>
-        </header>
+        <ChatHeader
+          activeThread={activeThread}
+          sidebarOpen={sidebarOpen}
+          onSidebarToggle={() => setSidebarOpen((o) => !o)}
+        />
 
         <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-hidden px-2 sm:px-4">
-          <ImageGenerationPanel
-            activeThreadId={activeThreadId}
-            images={generatedImages}
-            loading={imagesLoading}
-            onThreadResolved={(threadId) => {
-              if (threadId !== activeThreadId) {
-                setActiveThreadId(threadId);
-              }
-            }}
-            onImagesUpdated={setGeneratedImages}
-          />
-          <MessageList messages={messages} isStreaming={isStreaming} />
+          {timelineMessages.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <MessageList
+              messages={timelineMessages}
+              isStreaming={isBusy}
+              onImageRegenerate={(image) => {
+                void handleImageGeneration({
+                  prompt: image.prompt,
+                  style: (image.style as any) ?? undefined,
+                  aspect_ratio: (image.aspect_ratio as any) ?? undefined,
+                });
+              }}
+            />
+          )}
         </main>
 
-        <InputBar disabled={isStreaming} onSend={sendMessage} />
+        <InputBar
+          disabled={isBusy}
+          activeThreadId={activeThreadId}
+          onSend={handleSendMessage}
+          onGenerateImage={handleImageGeneration}
+          onUploadPdf={handlePdfUpload}
+        />
       </div>
     </div>
   );

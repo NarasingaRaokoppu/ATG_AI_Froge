@@ -11,6 +11,9 @@ import type {
   ImageGenerateResponse,
   ImageStyle,
   MessageDTO,
+  RagChatResponse,
+  RagDocument,
+  RagUploadResponse,
   Thread,
   UploadAttachmentResponse,
   User,
@@ -60,4 +63,25 @@ export const imageApi = {
     aspect_ratio?: ImageAspectRatio;
     enhance_prompt?: boolean;
   }) => api.post<ImageGenerateResponse>("/v1/images/regenerate", payload),
+};
+
+export const ragApi = {
+  uploadPdf: (threadId: string, file: File) => {
+    const form = new FormData();
+    form.append("thread_id", threadId);
+    form.append("file", file);
+    return api.postForm<RagUploadResponse>("/v1/rag/upload", form);
+  },
+  chat: (payload: {
+    thread_id: string;
+    question: string;
+    top_k?: number;
+    document_ids?: string[];
+  }) => api.post<RagChatResponse>("/v1/rag/chat", payload),
+  listDocuments: (threadId: string) =>
+    api.get<RagDocument[]>(`/v1/rag/documents?thread_id=${threadId}`),
+  deleteDocument: (threadId: string, documentId: string) =>
+    api.delete<{ deleted: boolean; document_id: string }>(
+      `/v1/rag/documents/${documentId}?thread_id=${threadId}`
+    ),
 };

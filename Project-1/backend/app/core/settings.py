@@ -33,6 +33,13 @@ class Settings(BaseSettings):
 
     # ChromaDB
     CHROMA_PERSIST_DIR: str = "./chroma_db"
+    RAG_COLLECTION_PREFIX: str = "rag"
+    RAG_MAX_UPLOAD_MB: int = 50
+    RAG_CHUNK_SIZE: int = 1200
+    RAG_CHUNK_OVERLAP: int = 150
+    RAG_TOP_K: int = 6
+    RAG_MIN_CONFIDENCE: float = 0.18
+    RAG_HISTORY_TURNS: int = 5
 
     # Google Sheets
     GOOGLE_SERVICE_ACCOUNT_JSON: str | None = None

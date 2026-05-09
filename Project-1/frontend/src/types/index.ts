@@ -3,7 +3,7 @@
  */
 
 export type Role = "user" | "assistant";
-export type AttachmentType = "image" | "video" | "video_frame" | "table" | "code" | "formula" | "excel" | "docx" | "txt";
+export type AttachmentType = "image" | "video" | "video_frame" | "table" | "code" | "formula" | "excel" | "docx" | "txt" | "pdf";
 
 export interface MessageAttachment {
   attachment_type: AttachmentType;
@@ -14,11 +14,27 @@ export interface MessageAttachment {
   metadata?: Record<string, unknown> | null;
 }
 
+export type MessageType =
+  | "text"
+  | "image"
+  | "pdf"
+  | "rag_response"
+  | "system"
+  | "upload";
+
+export type MessageStatus = "loading" | "success" | "error";
+
 export interface ChatMessage {
   id: string;
   role: Role;
   content: string;
   attachments?: MessageAttachment[];
+  message_type?: MessageType;
+  created_at?: string;
+  status?: MessageStatus;
+  error?: string | null;
+  citations?: RagCitation[];
+  metadata?: Record<string, unknown> | null;
   /** True while this assistant message is still streaming. */
   pending?: boolean;
 }
@@ -95,4 +111,38 @@ export interface ImageGenerateRequest {
 export interface ImageGenerateResponse {
   thread_id: string;
   image: GeneratedImage;
+}
+
+export interface RagDocument {
+  id: string;
+  user_id: string;
+  thread_id: string;
+  filename: string;
+  file_size: number;
+  status: "queued" | "processing" | "processed" | "failed";
+  upload_time: string;
+  processing_time?: number | null;
+  chunk_count: number;
+  embedding_model: string;
+}
+
+export interface RagUploadResponse {
+  document: RagDocument;
+  message: string;
+}
+
+export interface RagCitation {
+  document_id: string;
+  filename: string;
+  page_number?: number | null;
+  chunk_id: string;
+  content_preview: string;
+  score: number;
+}
+
+export interface RagChatResponse {
+  answer: string;
+  confidence?: number | null;
+  citations: RagCitation[];
+  grounded: boolean;
 }
