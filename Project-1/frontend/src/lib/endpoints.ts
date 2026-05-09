@@ -5,6 +5,11 @@
 
 import { api } from "./api";
 import type {
+  GeneratedImage,
+  ImageAspectRatio,
+  ImageGenerateRequest,
+  ImageGenerateResponse,
+  ImageStyle,
   MessageDTO,
   Thread,
   UploadAttachmentResponse,
@@ -39,4 +44,20 @@ export const uploadApi = {
     form.append("file", file);
     return api.postForm<UploadAttachmentResponse>("/upload", form);
   },
+};
+
+export const imageApi = {
+  generate: (payload: ImageGenerateRequest) =>
+    api.post<ImageGenerateResponse>("/v1/images/generate", payload),
+  listByThread: (threadId: string) =>
+    api.get<GeneratedImage[]>(`/v1/threads/${threadId}/images`),
+  remove: (imageId: string) =>
+    api.delete<{ deleted: boolean; image_id: string }>(`/v1/images/${imageId}`),
+  regenerate: (payload: {
+    image_id: string;
+    prompt_override?: string | null;
+    style?: ImageStyle;
+    aspect_ratio?: ImageAspectRatio;
+    enhance_prompt?: boolean;
+  }) => api.post<ImageGenerateResponse>("/v1/images/regenerate", payload),
 };

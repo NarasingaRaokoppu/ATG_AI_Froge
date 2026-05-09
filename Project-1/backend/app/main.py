@@ -15,9 +15,16 @@ from app.api import chat as chat_router
 from app.api import messages as messages_router
 from app.api import threads as threads_router
 from app.api import upload as upload_router
+from app.api.v1.routes import images as images_v1_router
 from app.core import settings
 from app.db import Base, engine
-from app.models import Message, Thread, User  # noqa: F401  (register mappers)
+from app.models import (  # noqa: F401  (register mappers)
+    GeneratedImage,
+    ImageGenerationLog,
+    Message,
+    Thread,
+    User,
+)
 
 
 def _resolve_upload_dir() -> Path:
@@ -97,6 +104,7 @@ app.include_router(threads_router.router, prefix="/api")
 app.include_router(messages_router.router, prefix="/api")
 app.include_router(chat_router.router, prefix="/api")
 app.include_router(upload_router.router, prefix="/api")
+app.include_router(images_v1_router.router, prefix="/api")
 
 # Serve uploaded files directly for inline chat rendering.
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR_PATH)), name="uploads")

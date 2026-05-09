@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "gemini/gemini-2.5-flash"
     LITELLM_EMBEDDING_MODEL: str = "text-embedding-3-large"
     IMAGE_GEN_MODEL: str = "gemini/imagen-4.0-fast-generate-001"
+    IMAGE_GEN_MAX_RETRIES: int = 2
+    IMAGE_GEN_RATE_LIMIT_PER_MINUTE: int = 10
+    IMAGE_GEN_PROMPT_MAX_LENGTH: int = 2000
     LITELLM_USER_ID: str | None = None
 
     # Google OAuth

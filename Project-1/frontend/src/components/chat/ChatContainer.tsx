@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { messageApi, threadApi } from "../../lib/endpoints";
+import { imageApi, messageApi, threadApi } from "../../lib/endpoints";
 import { streamChat } from "../../lib/chatStream";
-import type { ChatMessage, MessageAttachment, Thread } from "../../types";
+import type {
+  ChatMessage,
+  GeneratedImage,
+  MessageAttachment,
+  Thread,
+} from "../../types";
 import { InputBar } from "./InputBar";
+import { ImageGenerationPanel } from "../images/ImageGenerationPanel";
 import { MessageList } from "./MessageList";
 import { Sidebar } from "./Sidebar";
 
@@ -18,6 +24,8 @@ export function ChatContainer() {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
+  const [imagesLoading, setImagesLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const justCreatedRef = useRef(false);
@@ -49,6 +57,8 @@ export function ChatContainer() {
   useEffect(() => {
     if (!activeThreadId) {
       setMessages([]);
+      setGeneratedImages([]);
+      setImagesLoading(false);
       return;
     }
     if (justCreatedRef.current) {
@@ -68,6 +78,14 @@ export function ChatContainer() {
           attachments: m.attachments ?? [],
         }))
       );
+
+      setImagesLoading(true);
+      try {
+        const imageList = await imageApi.listByThread(activeThreadId);
+        if (!cancelled) setGeneratedImages(imageList);
+      } finally {
+        if (!cancelled) setImagesLoading(false);
+      }
     })();
     return () => {
       cancelled = true;
@@ -78,6 +96,7 @@ export function ChatContainer() {
     if (isStreaming) return;
     setActiveThreadId(null);
     setMessages([]);
+    setGeneratedImages([]);
     setSidebarOpen(false);
   }, [isStreaming]);
 
@@ -258,6 +277,17 @@ export function ChatContainer() {
         </header>
 
         <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-hidden px-2 sm:px-4">
+          <ImageGenerationPanel
+            activeThreadId={activeThreadId}
+            images={generatedImages}
+            loading={imagesLoading}
+            onThreadResolved={(threadId) => {
+              if (threadId !== activeThreadId) {
+                setActiveThreadId(threadId);
+              }
+            }}
+            onImagesUpdated={setGeneratedImages}
+          />
           <MessageList messages={messages} isStreaming={isStreaming} />
         </main>
 
