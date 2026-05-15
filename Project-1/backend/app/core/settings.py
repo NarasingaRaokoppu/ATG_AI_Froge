@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     # Google Sheets
     GOOGLE_SERVICE_ACCOUNT_JSON: str | None = None
 
+    # Project 10: Research Digest Agent
+    ARXIV_API_URL: str = "https://export.arxiv.org/api/query"
+    ARXIV_USER_AGENT: str = "amzur-ai-chat/1.0 (research-digest-agent)"
+    RESEARCH_DIGEST_TIMEOUT_SECONDS: int = 30
+
     # File uploads
     MAX_UPLOAD_MB: int = 20
     UPLOAD_DIR: str = "./uploads"

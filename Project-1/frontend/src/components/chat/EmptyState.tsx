@@ -1,7 +1,9 @@
+import { ProjectLinks } from "../navigation/ProjectLinks";
+
 export function EmptyState() {
   return (
     <div className="flex flex-1 items-center justify-center px-4 py-8">
-      <div className="max-w-lg text-center">
+      <div className="w-full max-w-5xl text-center">
         <div className="mb-4 text-4xl">💬</div>
         
         <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 sm:text-2xl">
@@ -11,6 +13,13 @@ export function EmptyState() {
         <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
           Start a conversation, upload documents, generate images, or analyze files.
         </p>
+
+        <div className="mt-6 text-left">
+          <div className="mb-3 text-center text-xs font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+            Jump To Projects
+          </div>
+          <ProjectLinks variant="cards" />
+        </div>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <SuggestedAction

@@ -259,3 +259,37 @@ export interface SqlQueryHistoryItem {
   chart_suggestion?: Record<string, unknown> | null;
   created_at: string;
 }
+
+export interface ResearchPaper {
+  arxiv_id: string;
+  title: string;
+  authors: string[];
+  summary: string;
+  published: string;
+  updated: string;
+  primary_category?: string | null;
+  pdf_url?: string | null;
+  abs_url: string;
+}
+
+export interface ResearchDigestDecision {
+  enough_evidence: boolean;
+  confidence: number;
+  rationale: string;
+  missing_angles: string[];
+}
+
+export interface ResearchDigestSection {
+  id: string;
+  title: string;
+  content: string;
+}
+
+export interface ResearchDigestResponse {
+  topic: string;
+  executed_queries: string[];
+  rounds_completed: number;
+  papers: ResearchPaper[];
+  decision: ResearchDigestDecision;
+  sections: ResearchDigestSection[];
+}

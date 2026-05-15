@@ -6,6 +6,7 @@ import { useAuthStore } from "./lib/authStore";
 import AuthCallback from "./pages/AuthCallback";
 import DataExplorerPage from "./pages/DataExplorerPage";
 import Login from "./pages/Login";
+import ResearchDigestPage from "./pages/ResearchDigestPage";
 import Register from "./pages/Register";
 import SpreadsheetExplorerPage from "./pages/SpreadsheetExplorerPage";
 
@@ -49,6 +50,10 @@ export default function App() {
       <Route
         path="/spreadsheet-explorer"
         element={user ? <SpreadsheetExplorerPage /> : <Navigate to="/login" replace />}
+      />
+      <Route
+        path="/research-digest"
+        element={user ? <ResearchDigestPage /> : <Navigate to="/login" replace />}
       />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route

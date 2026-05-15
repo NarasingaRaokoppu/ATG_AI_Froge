@@ -1,4 +1,5 @@
 import type { Thread } from "../../types";
+import { ProjectLinks } from "../navigation/ProjectLinks";
 
 interface ChatHeaderProps {
   activeThread: Thread | null;
@@ -30,6 +31,9 @@ export function ChatHeader({
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Powered by Gemini via LiteLLM proxy
           </p>
+          <div className="mt-3">
+            <ProjectLinks variant="compact" />
+          </div>
         </div>
       </div>
     </header>
