@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str
+    DB_CONNECTION_ENCRYPTION_KEY: str | None = None
 
     # Amzur LiteLLM Proxy
     LITELLM_PROXY_URL: str

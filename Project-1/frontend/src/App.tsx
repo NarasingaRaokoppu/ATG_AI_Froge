@@ -3,9 +3,11 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { ChatContainer } from "./components/chat/ChatContainer";
 import { useAuthStore } from "./lib/authStore";
+import AuthCallback from "./pages/AuthCallback";
+import DataExplorerPage from "./pages/DataExplorerPage";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import AuthCallback from "./pages/AuthCallback";
+import SpreadsheetExplorerPage from "./pages/SpreadsheetExplorerPage";
 
 export default function App() {
   const { user, loading, hydrate } = useAuthStore();
@@ -39,6 +41,14 @@ export default function App() {
       <Route
         path="/chat"
         element={user ? <ChatContainer /> : <Navigate to="/login" replace />}
+      />
+      <Route
+        path="/data-explorer"
+        element={user ? <DataExplorerPage /> : <Navigate to="/login" replace />}
+      />
+      <Route
+        path="/spreadsheet-explorer"
+        element={user ? <SpreadsheetExplorerPage /> : <Navigate to="/login" replace />}
       />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route

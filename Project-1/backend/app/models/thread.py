@@ -35,3 +35,16 @@ class Thread(Base):
         cascade="all, delete-orphan",
         order_by="Message.created_at",
     )
+    sql_query_history: Mapped[list["SqlQueryHistory"]] = relationship(  # noqa: F821
+        cascade="all, delete-orphan",
+        order_by="SqlQueryHistory.created_at",
+    )
+    spreadsheet_sessions: Mapped[list["SpreadsheetSession"]] = relationship(  # noqa: F821
+        cascade="all, delete-orphan",
+        order_by="SpreadsheetSession.created_at",
+    )
+    spreadsheet_query_history: Mapped[list["SpreadsheetQueryHistory"]] = relationship(  # noqa: F821
+        back_populates="thread",
+        cascade="all, delete-orphan",
+        order_by="SpreadsheetQueryHistory.created_at",
+    )

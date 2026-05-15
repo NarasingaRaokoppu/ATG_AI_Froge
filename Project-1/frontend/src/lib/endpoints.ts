@@ -14,6 +14,8 @@ import type {
   RagChatResponse,
   RagDocument,
   RagUploadResponse,
+  SpreadsheetHistoryItem,
+  SpreadsheetUploadResponse,
   Thread,
   UploadAttachmentResponse,
   User,
@@ -84,4 +86,21 @@ export const ragApi = {
     api.delete<{ deleted: boolean; document_id: string }>(
       `/v1/rag/documents/${documentId}?thread_id=${threadId}`
     ),
+};
+
+export const spreadsheetApi = {
+  upload: (threadId: string, file: File) => {
+    const form = new FormData();
+    form.append("thread_id", threadId);
+    form.append("file", file);
+    return api.postForm<SpreadsheetUploadResponse>("/spreadsheet/upload", form);
+  },
+  connectGoogleSheet: (payload: {
+    thread_id: string;
+    google_sheet_url?: string;
+    spreadsheet_id?: string;
+    worksheet_title?: string;
+  }) => api.post<SpreadsheetUploadResponse>("/spreadsheet/google-sheet", payload),
+  history: (threadId: string) =>
+    api.get<SpreadsheetHistoryItem[]>(`/spreadsheet/history/${threadId}`),
 };

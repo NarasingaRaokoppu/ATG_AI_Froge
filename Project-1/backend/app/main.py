@@ -15,11 +15,14 @@ from app.api import chat as chat_router
 from app.api import messages as messages_router
 from app.api import threads as threads_router
 from app.api import upload as upload_router
+from app.api.routes import spreadsheet as spreadsheet_router
+from app.api.routes import sql as sql_router
 from app.api.v1.routes import images as images_v1_router
 from app.api.v1.routes import rag as rag_v1_router
 from app.core import settings
 from app.db import Base, engine
 from app.models import (  # noqa: F401  (register mappers)
+    DatabaseConnection,
     Document,
     DocumentChunk,
     GeneratedImage,
@@ -27,6 +30,9 @@ from app.models import (  # noqa: F401  (register mappers)
     Message,
     RagChatHistory,
     DocumentProcessingLog,
+    SpreadsheetQueryHistory,
+    SpreadsheetSession,
+    SqlQueryHistory,
     Thread,
     User,
 )
@@ -109,6 +115,8 @@ app.include_router(threads_router.router, prefix="/api")
 app.include_router(messages_router.router, prefix="/api")
 app.include_router(chat_router.router, prefix="/api")
 app.include_router(upload_router.router, prefix="/api")
+app.include_router(spreadsheet_router.router, prefix="/api")
+app.include_router(sql_router.router, prefix="/api")
 app.include_router(images_v1_router.router, prefix="/api")
 app.include_router(rag_v1_router.router, prefix="/api")
 

@@ -29,3 +29,17 @@ class User(Base):
     threads: Mapped[list["Thread"]] = relationship(  # noqa: F821
         back_populates="user", cascade="all, delete-orphan"
     )
+    database_connections: Mapped[list["DatabaseConnection"]] = relationship(  # noqa: F821
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+    sql_query_history: Mapped[list["SqlQueryHistory"]] = relationship(  # noqa: F821
+        cascade="all, delete-orphan"
+    )
+    spreadsheet_sessions: Mapped[list["SpreadsheetSession"]] = relationship(  # noqa: F821
+        cascade="all, delete-orphan"
+    )
+    spreadsheet_query_history: Mapped[list["SpreadsheetQueryHistory"]] = relationship(  # noqa: F821
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )

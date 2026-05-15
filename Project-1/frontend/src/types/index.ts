@@ -146,3 +146,116 @@ export interface RagChatResponse {
   citations: RagCitation[];
   grounded: boolean;
 }
+
+export interface DatabaseConnection {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  has_password: boolean;
+  created_at: string;
+  updated_at: string;
+  last_tested_at?: string | null;
+}
+
+export interface DatabaseConnectionCreateInput {
+  name: string;
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+}
+
+export interface DatabaseConnectionUpdateInput {
+  name?: string;
+  host?: string;
+  port?: number;
+  database?: string;
+  username?: string;
+  password?: string;
+}
+
+export interface ChartSuggestion {
+  chart_type: "bar" | "line" | "pie" | "table";
+  x_axis?: string | null;
+  y_axis?: string | null;
+}
+
+export interface SqlQueryResponse {
+  generated_sql: string;
+  rows: Record<string, unknown>[];
+  explanation: string;
+  chart_suggestion: ChartSuggestion;
+  execution_time_ms: number;
+}
+
+export interface SpreadsheetQueryResponse {
+  generated_code: string;
+  rows: Record<string, unknown>[];
+  explanation: string;
+  chart_suggestion: ChartSuggestion;
+}
+
+export interface SpreadsheetSession {
+  id: string;
+  thread_id: string;
+  source_type: string;
+  file_path?: string | null;
+  original_filename?: string | null;
+  mime_type?: string | null;
+  google_sheet_url?: string | null;
+  sheet_name?: string | null;
+  dataframe_metadata?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SpreadsheetUploadResponse {
+  session: SpreadsheetSession;
+  message: string;
+}
+
+export interface SpreadsheetAgentResponse {
+  question: string;
+  answer: string;
+  explanation: string;
+  generated_code: string;
+  computed_result?: unknown;
+  rows: Record<string, unknown>[];
+  columns: string[];
+  chart: ChartSuggestion;
+  execution_ms: number;
+  intermediate_steps: string[];
+}
+
+export interface SpreadsheetHistoryItem {
+  id: string;
+  thread_id: string;
+  spreadsheet_session_id?: string | null;
+  question: string;
+  generated_code: string;
+  answer_summary: string;
+  execution_ms: number;
+  row_count: number;
+  columns?: string[] | null;
+  chart_metadata?: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface SqlQueryHistoryItem {
+  id: string;
+  thread_id: string;
+  database_connection_id?: string | null;
+  source_type: string;
+  user_question: string;
+  generated_sql: string;
+  execution_time_ms: number;
+  row_count: number;
+  result_columns?: string[] | null;
+  assistant_summary: string;
+  chart_suggestion?: Record<string, unknown> | null;
+  created_at: string;
+}
