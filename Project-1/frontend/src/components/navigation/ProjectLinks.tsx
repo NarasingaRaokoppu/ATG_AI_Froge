@@ -21,6 +21,12 @@ const PROJECT_LINKS = [
     label: "Research Digest",
     description: "Search arXiv, gather evidence, and stream a live digest.",
   },
+  {
+    to: "/tic-tac-toe",
+    badge: "Project 11",
+    label: "Tic Tac Toe",
+    description: "Play the classic Tic Tac Toe game.",
+  }
 ];
 
 interface ProjectLinksProps {

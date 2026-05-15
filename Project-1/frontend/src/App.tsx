@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import ResearchDigestPage from "./pages/ResearchDigestPage";
 import Register from "./pages/Register";
 import SpreadsheetExplorerPage from "./pages/SpreadsheetExplorerPage";
+import TicTacToePage from "./pages/TicTacToe/TicTacToePage";
 
 export default function App() {
   const { user, loading, hydrate } = useAuthStore();
@@ -56,6 +57,7 @@ export default function App() {
         element={user ? <ResearchDigestPage /> : <Navigate to="/login" replace />}
       />
       <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/tic-tac-toe" element={<TicTacToePage />} />
       <Route
         path="*"
         element={<Navigate to={user ? "/chat" : "/login"} replace />}
