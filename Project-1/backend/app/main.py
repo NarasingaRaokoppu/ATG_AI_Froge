@@ -18,6 +18,7 @@ from app.api import upload as upload_router
 from app.api.routes import research_digest as research_digest_router
 from app.api.routes import spreadsheet as spreadsheet_router
 from app.api.routes import sql as sql_router
+from app.api.routes import tic_tac_toe as tic_tac_toe_router
 from app.api.v1.routes import images as images_v1_router
 from app.api.v1.routes import rag as rag_v1_router
 from app.core import settings
@@ -119,6 +120,7 @@ app.include_router(upload_router.router, prefix="/api")
 app.include_router(spreadsheet_router.router, prefix="/api")
 app.include_router(sql_router.router, prefix="/api")
 app.include_router(research_digest_router.router, prefix="/api")
+app.include_router(tic_tac_toe_router.router, prefix="/api")
 app.include_router(images_v1_router.router, prefix="/api")
 app.include_router(rag_v1_router.router, prefix="/api")
 
