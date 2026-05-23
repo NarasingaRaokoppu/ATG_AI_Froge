@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
-import asyncio
+import ast
 import json
 import re
+import sys
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from typing import Any
-from xml.etree import ElementTree
 
-import httpx
 from fastapi import HTTPException, status
+from langgraph.prebuilt import create_react_agent
+
+try:
+    from langchain_mcp_adapters.client import MultiServerMCPClient
+except Exception:  # pragma: no cover - handled with runtime error message
+    MultiServerMCPClient = None
 
 from app.ai.llm import llm
 from app.core import settings
@@ -23,11 +28,9 @@ from app.schemas.research_digest import (
     ResearchPaper,
 )
 
-_ATOM_NS = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
 _DEFAULT_MAX_ROUNDS = 3
 _DEFAULT_PAPERS_PER_ROUND = 5
-_ARXIV_MAX_RETRIES = 3
-_ARXIV_RETRY_BACKOFF_SECONDS = 2.0
+_MCP_SEARCH_TOOL = "search_papers"
 _SECTION_SPECS: tuple[tuple[str, str, str], ...] = (
     (
         "executive-summary",
@@ -97,46 +100,220 @@ def _parse_iso8601(value: str | None) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
-def parse_arxiv_feed(xml_text: str) -> list[ResearchPaper]:
-    """Parse the arXiv Atom response into normalized paper records."""
-    root = ElementTree.fromstring(xml_text)
+def _json_or_literal(value: str) -> Any:
+    text = _strip_code_fences(value)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return ast.literal_eval(text)
+
+
+def _parse_mcp_args(raw_args: str) -> list[str]:
+    try:
+        parsed = json.loads(raw_args)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "invalid_mcp_args",
+                "message": "ARXIV_MCP_ARGS must be valid JSON array syntax.",
+            },
+        ) from exc
+
+    if not isinstance(parsed, list) or not all(isinstance(item, str) for item in parsed):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "invalid_mcp_args",
+                "message": "ARXIV_MCP_ARGS must decode to a list of strings.",
+            },
+        )
+    return parsed
+
+
+def _normalize_authors(raw_authors: Any) -> list[str]:
+    if isinstance(raw_authors, list):
+        normalized: list[str] = []
+        for author in raw_authors:
+            if isinstance(author, str) and author.strip():
+                normalized.append(author.strip())
+                continue
+            if isinstance(author, dict):
+                name = author.get("name")
+                if isinstance(name, str) and name.strip():
+                    normalized.append(name.strip())
+        return normalized
+    return []
+
+
+def _extract_entries(payload: Any) -> list[dict[str, Any]]:
+    if isinstance(payload, list):
+        return [entry for entry in payload if isinstance(entry, dict)]
+
+    if isinstance(payload, dict):
+        for key in ("papers", "results", "items", "entries", "data"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return [entry for entry in value if isinstance(entry, dict)]
+            if isinstance(value, dict):
+                nested = _extract_entries(value)
+                if nested:
+                    return nested
+    return []
+
+
+def _normalize_mcp_search_payload(payload: Any) -> list[ResearchPaper]:
     papers: list[ResearchPaper] = []
-
-    for entry in root.findall("atom:entry", _ATOM_NS):
-        raw_id = entry.findtext("atom:id", default="", namespaces=_ATOM_NS).strip()
+    for item in _extract_entries(payload):
+        raw_id = str(
+            item.get("paper_id")
+            or item.get("arxiv_id")
+            or item.get("id")
+            or item.get("identifier")
+            or ""
+        ).strip()
         arxiv_id = raw_id.rsplit("/", 1)[-1]
-        title = _compact_whitespace(entry.findtext("atom:title", default="", namespaces=_ATOM_NS))
-        summary = _compact_whitespace(entry.findtext("atom:summary", default="", namespaces=_ATOM_NS))
-        authors = [
-            _compact_whitespace(author.findtext("atom:name", default="", namespaces=_ATOM_NS))
-            for author in entry.findall("atom:author", _ATOM_NS)
-            if _compact_whitespace(author.findtext("atom:name", default="", namespaces=_ATOM_NS))
-        ]
-        category = entry.find("arxiv:primary_category", _ATOM_NS)
-        pdf_url: str | None = None
-        for link in entry.findall("atom:link", _ATOM_NS):
-            if link.attrib.get("title") == "pdf" or link.attrib.get("type") == "application/pdf":
-                pdf_url = link.attrib.get("href")
-                break
 
+        title = _compact_whitespace(str(item.get("title") or ""))
         if not arxiv_id or not title:
             continue
+
+        summary = _compact_whitespace(str(item.get("summary") or item.get("abstract") or ""))
+        published = _parse_iso8601(str(item.get("published") or item.get("submitted") or ""))
+        updated = _parse_iso8601(str(item.get("updated") or item.get("published") or ""))
+        categories = item.get("categories")
+        primary_category = item.get("primary_category")
+        if not primary_category and isinstance(categories, list) and categories:
+            first = categories[0]
+            if isinstance(first, str):
+                primary_category = first
+
+        pdf_url = item.get("pdf_url") or item.get("pdf")
+        abs_url = item.get("abs_url") or item.get("url") or f"https://arxiv.org/abs/{arxiv_id}"
 
         papers.append(
             ResearchPaper(
                 arxiv_id=arxiv_id,
                 title=title,
-                authors=authors,
+                authors=_normalize_authors(item.get("authors")),
                 summary=summary,
-                published=_parse_iso8601(entry.findtext("atom:published", namespaces=_ATOM_NS)),
-                updated=_parse_iso8601(entry.findtext("atom:updated", namespaces=_ATOM_NS)),
-                primary_category=category.attrib.get("term") if category is not None else None,
-                pdf_url=pdf_url,
-                abs_url=raw_id,
+                published=published,
+                updated=updated,
+                primary_category=primary_category if isinstance(primary_category, str) else None,
+                pdf_url=pdf_url if isinstance(pdf_url, str) else None,
+                abs_url=abs_url if isinstance(abs_url, str) else f"https://arxiv.org/abs/{arxiv_id}",
             )
         )
-
     return papers
+
+
+def _coerce_structured_content(value: Any) -> Any:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, list):
+        merged = _coerce_text(value)
+        if merged:
+            return _json_or_literal(merged)
+        return value
+    if isinstance(value, str):
+        return _json_or_literal(value)
+    raise ValueError("Unable to decode MCP tool content")
+
+
+def _extract_mcp_tool_payload(messages: list[Any]) -> Any:
+    for message in reversed(messages):
+        name = getattr(message, "name", "")
+        if name != _MCP_SEARCH_TOOL:
+            continue
+        return _coerce_structured_content(getattr(message, "content", ""))
+
+    if messages:
+        return _coerce_structured_content(getattr(messages[-1], "content", ""))
+    raise ValueError("No MCP messages returned")
+
+
+async def _run_search_tool_via_langgraph(*, query: str, max_results: int) -> Any:
+    if MultiServerMCPClient is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "missing_mcp_dependency",
+                "message": "Install langchain-mcp-adapters to enable Project 12 MCP integration.",
+            },
+        )
+
+    configured_args = _parse_mcp_args(settings.ARXIV_MCP_ARGS)
+    candidate_launchers = [
+        (settings.ARXIV_MCP_COMMAND, configured_args),
+        ("arxiv-mcp-server", []),
+        (sys.executable, ["-m", "arxiv_mcp_server"]),
+    ]
+
+    last_error: Exception | None = None
+    for index, (command, args) in enumerate(candidate_launchers):
+        mcp_client = MultiServerMCPClient(
+            {
+                settings.ARXIV_MCP_SERVER_NAME: {
+                    "command": command,
+                    "args": args,
+                    "transport": settings.ARXIV_MCP_TRANSPORT,
+                }
+            }
+        )
+        try:
+            tools = await mcp_client.get_tools()
+            if not tools:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail={
+                        "error": "mcp_tools_unavailable",
+                        "message": "Connected to MCP server but no tools were exposed.",
+                    },
+                )
+
+            agent = create_react_agent(model=llm, tools=tools)
+            response = await agent.ainvoke(
+                {
+                    "messages": [
+                        (
+                            "system",
+                            "You are an arXiv retrieval worker. Call the search_papers MCP tool exactly once. "
+                            "Then return only raw JSON from the tool response with no markdown and no explanation.",
+                        ),
+                        (
+                            "human",
+                            f"query={query}\nmax_results={max_results}\nsort_by=relevance",
+                        ),
+                    ]
+                }
+            )
+            messages = response.get("messages", []) if isinstance(response, dict) else []
+            try:
+                return _extract_mcp_tool_payload(messages)
+            except Exception:
+                # If the LLM does not surface tool output in a parseable shape, call the tool directly.
+                search_tool = next((tool for tool in tools if getattr(tool, "name", "") == _MCP_SEARCH_TOOL), None)
+                if search_tool is None:
+                    raise
+                return await search_tool.ainvoke(
+                    {
+                        "query": query,
+                        "max_results": max_results,
+                        "sort_by": "relevance",
+                    }
+                )
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            if index == len(candidate_launchers) - 1:
+                break
+        finally:
+            aclose = getattr(mcp_client, "aclose", None)
+            if callable(aclose):
+                await aclose()
+
+    if isinstance(last_error, HTTPException):
+        raise last_error
+    raise RuntimeError(f"Unable to start MCP launcher candidates: {last_error}")
 
 
 def _paper_digest_brief(papers: list[ResearchPaper]) -> str:
@@ -189,67 +366,28 @@ Rules:
 
 
 async def _search_arxiv(query: str, max_results: int) -> list[ResearchPaper]:
-    params = {
-        "search_query": query,
-        "start": 0,
-        "max_results": max_results,
-        "sortBy": "relevance",
-        "sortOrder": "descending",
-    }
-    headers = {"User-Agent": settings.ARXIV_USER_AGENT}
-    timeout = httpx.Timeout(settings.RESEARCH_DIGEST_TIMEOUT_SECONDS)
-    async with httpx.AsyncClient(timeout=timeout, headers=headers) as client:
-        for attempt in range(1, _ARXIV_MAX_RETRIES + 1):
-            try:
-                response = await client.get(settings.ARXIV_API_URL, params=params)
-                response.raise_for_status()
-                return parse_arxiv_feed(response.text)
-            except httpx.HTTPStatusError as exc:
-                if exc.response.status_code != status.HTTP_429_TOO_MANY_REQUESTS:
-                    raise
+    try:
+        payload = await _run_search_tool_via_langgraph(query=query, max_results=max_results)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": "arxiv_mcp_unavailable",
+                "message": "Unable to query arXiv MCP server right now. Please try again shortly.",
+            },
+        ) from exc
 
-                if attempt >= _ARXIV_MAX_RETRIES:
-                    raise HTTPException(
-                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                        detail={
-                            "error": "arxiv_rate_limited",
-                            "message": (
-                                "arXiv is rate-limiting requests right now. "
-                                "Please wait a moment and try again."
-                            ),
-                        },
-                    ) from exc
-
-                retry_after_header = exc.response.headers.get("Retry-After")
-                retry_after_seconds = _ARXIV_RETRY_BACKOFF_SECONDS * attempt
-                if retry_after_header:
-                    try:
-                        retry_after_seconds = max(
-                            retry_after_seconds,
-                            float(retry_after_header),
-                        )
-                    except ValueError:
-                        pass
-                await asyncio.sleep(retry_after_seconds)
-            except httpx.RequestError as exc:
-                if attempt >= _ARXIV_MAX_RETRIES:
-                    raise HTTPException(
-                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                        detail={
-                            "error": "arxiv_unavailable",
-                            "message": (
-                                "Unable to reach arXiv right now. "
-                                "Please try again shortly."
-                            ),
-                        },
-                    ) from exc
-                await asyncio.sleep(_ARXIV_RETRY_BACKOFF_SECONDS * attempt)
+    papers = _normalize_mcp_search_payload(payload)
+    if papers:
+        return papers[:max_results]
 
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         detail={
-            "error": "arxiv_unavailable",
-            "message": "Unable to reach arXiv right now. Please try again shortly.",
+            "error": "arxiv_mcp_empty",
+            "message": "MCP search returned no usable papers for this query.",
         },
     )
 

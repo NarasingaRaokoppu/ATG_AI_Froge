@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     ARXIV_USER_AGENT: str = "amzur-ai-chat/1.0 (research-digest-agent)"
     RESEARCH_DIGEST_TIMEOUT_SECONDS: int = 30
 
+    # Project 12: MCP-backed Research Digest Agent
+    ARXIV_MCP_SERVER_NAME: str = "arxiv"
+    ARXIV_MCP_COMMAND: str = "arxiv-mcp-server"
+    ARXIV_MCP_ARGS: str = "[]"
+    ARXIV_MCP_TRANSPORT: str = "stdio"
+
     # File uploads
     MAX_UPLOAD_MB: int = 20
     UPLOAD_DIR: str = "./uploads"
