@@ -5,6 +5,7 @@ import { ChatContainer } from "./components/chat/ChatContainer";
 import { useAuthStore } from "./lib/authStore";
 import AuthCallback from "./pages/AuthCallback";
 import DataExplorerPage from "./pages/DataExplorerPage";
+import ImageCompliancePage from "./pages/ImageCompliancePage";
 import Login from "./pages/Login";
 import ResearchDigestPage from "./pages/ResearchDigestPage";
 import Register from "./pages/Register";
@@ -55,6 +56,10 @@ export default function App() {
       <Route
         path="/research-digest"
         element={user ? <ResearchDigestPage /> : <Navigate to="/login" replace />}
+      />
+      <Route
+        path="/image-compliance"
+        element={user ? <ImageCompliancePage /> : <Navigate to="/login" replace />}
       />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/tic-tac-toe" element={<TicTacToePage />} />

@@ -40,7 +40,7 @@ async def make_ai_move(
     old_positions = set(i for i, cell in enumerate(board) if cell is not None)
     
     # Make the agent's move
-    updated_board = agent.make_move(board)
+    updated_board = await agent.make_move(board)
     
     # Find which position was filled
     new_positions = set(i for i, cell in enumerate(updated_board) if cell is not None)

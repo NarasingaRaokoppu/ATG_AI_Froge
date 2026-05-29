@@ -73,6 +73,58 @@ export interface UploadAttachmentResponse {
   video_frames?: string[] | null;
 }
 
+export type ComplianceOperator =
+  | "eq"
+  | "neq"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "in"
+  | "contains"
+  | "regex"
+  | "exists";
+
+export interface ComplianceCondition {
+  field: string;
+  operator: ComplianceOperator;
+  value?: unknown;
+}
+
+export interface ComplianceRule {
+  id: string;
+  description: string;
+  logic?: "and" | "or";
+  conditions: ComplianceCondition[];
+}
+
+export interface ImageComplianceImageInput {
+  attachment_url: string;
+  name?: string | null;
+}
+
+export interface RuleEvaluation {
+  rule_id: string;
+  passed: boolean;
+  violations: string[];
+}
+
+export interface ImageComplianceResult {
+  image_name: string;
+  image_url: string;
+  extracted: Record<string, unknown>;
+  passed: boolean;
+  rule_results: RuleEvaluation[];
+}
+
+export interface ImageComplianceResponse {
+  run_id: string;
+  rule_set_name: string;
+  passed_count: number;
+  failed_count: number;
+  results: ImageComplianceResult[];
+}
+
 export type ImageStyle =
   | "photorealistic"
   | "cinematic"

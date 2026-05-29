@@ -15,6 +15,7 @@ from app.api import chat as chat_router
 from app.api import messages as messages_router
 from app.api import threads as threads_router
 from app.api import upload as upload_router
+from app.api.routes import image_compliance as image_compliance_router
 from app.api.routes import research_digest as research_digest_router
 from app.api.routes import spreadsheet as spreadsheet_router
 from app.api.routes import sql as sql_router
@@ -28,6 +29,7 @@ from app.models import (  # noqa: F401  (register mappers)
     Document,
     DocumentChunk,
     GeneratedImage,
+    ImageComplianceAudit,
     ImageGenerationLog,
     Message,
     RagChatHistory,
@@ -117,6 +119,7 @@ app.include_router(threads_router.router, prefix="/api")
 app.include_router(messages_router.router, prefix="/api")
 app.include_router(chat_router.router, prefix="/api")
 app.include_router(upload_router.router, prefix="/api")
+app.include_router(image_compliance_router.router, prefix="/api")
 app.include_router(spreadsheet_router.router, prefix="/api")
 app.include_router(sql_router.router, prefix="/api")
 app.include_router(research_digest_router.router, prefix="/api")

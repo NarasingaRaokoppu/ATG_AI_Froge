@@ -5,6 +5,7 @@ from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.document_processing_log import DocumentProcessingLog
 from app.models.generated_image import GeneratedImage
+from app.models.image_compliance_audit import ImageComplianceAudit
 from app.models.image_generation_log import ImageGenerationLog
 from app.models.message import Message
 from app.models.rag_chat_history import RagChatHistory
@@ -20,6 +21,7 @@ __all__ = [
 	"Thread",
 	"Message",
 	"GeneratedImage",
+	"ImageComplianceAudit",
 	"ImageGenerationLog",
 	"Document",
 	"DocumentChunk",

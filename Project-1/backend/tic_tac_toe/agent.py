@@ -1,27 +1,98 @@
+from __future__ import annotations
+
+import json
+import re
+from typing import Any
+
+from langchain_core.tools import tool
+from langgraph.prebuilt import create_react_agent
+
+from app.ai.llm import llm
+
+
+@tool
+def list_available_moves(board_json: str) -> str:
+    """Return all legal move indexes for the current tic-tac-toe board JSON list."""
+    board = json.loads(board_json)
+    moves = [idx for idx, cell in enumerate(board) if cell is None]
+    return json.dumps(moves)
+
+
+@tool
+def evaluate_position(board_json: str) -> str:
+    """Evaluate the board and return winner/draw/in_progress status."""
+    board = json.loads(board_json)
+    winner = _check_winner(board)
+    if winner:
+        return json.dumps({"status": "won", "winner": winner})
+    if all(cell is not None for cell in board):
+        return json.dumps({"status": "draw"})
+    return json.dumps({"status": "in_progress"})
+
+
+def _check_winner(board: list[str | None]) -> str | None:
+    lines = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8],
+        [0, 3, 6], [1, 4, 7], [2, 5, 8],
+        [0, 4, 8], [2, 4, 6],
+    ]
+    for a, b, c in lines:
+        if board[a] and board[a] == board[b] == board[c]:
+            return board[a]
+    return None
+
+
 class TicTacToeAgent:
-    """
-    AI agent for Tic Tac Toe using Minimax algorithm.
-    The agent plays as 'O' and the human plays as 'X'.
-    """
+    """LangChain-backed tic-tac-toe agent with deterministic fallback."""
 
     def __init__(self):
-        self.agent_player = 'O'
-        self.human_player = 'X'
+        self.agent_player = "O"
+        self.human_player = "X"
+        self._agent = create_react_agent(
+            model=llm,
+            tools=[list_available_moves, evaluate_position],
+        )
 
-    def make_move(self, board):
-        """
-        Calculate the best move for the agent using minimax algorithm.
-        
-        Args:
-            board: List of 9 elements representing the game board
-            
-        Returns:
-            Updated board with the agent's move
-        """
-        move = self._best_move(board)
+    async def make_move(self, board: list[str | None]) -> list[str | None]:
+        """Choose a move using LangChain agent and fallback to minimax when needed."""
+        move = await self._choose_move_with_langchain(board)
+        if move is None or move < 0 or move >= len(board) or board[move] is not None:
+            move = self._best_move(board)
+
         if move != -1:
             board[move] = self.agent_player
         return board
+
+    async def _choose_move_with_langchain(self, board: list[str | None]) -> int | None:
+        try:
+            board_json = json.dumps(board)
+            response = await self._agent.ainvoke(
+                {
+                    "messages": [
+                        (
+                            "system",
+                            "You are a tic-tac-toe strategist playing as O. "
+                            "Call tools if needed and return only the move index 0-8.",
+                        ),
+                        (
+                            "human",
+                            f"Board JSON: {board_json}. Return best legal move index for O.",
+                        ),
+                    ]
+                }
+            )
+            messages = response.get("messages", []) if isinstance(response, dict) else []
+            if not messages:
+                return None
+
+            content: Any = getattr(messages[-1], "content", "")
+            text = content if isinstance(content, str) else str(content)
+            match = re.search(r"\b([0-8])\b", text)
+            if not match:
+                return None
+            return int(match.group(1))
+        except Exception:
+            return None
 
     def _best_move(self, board):
         """Find the best move using minimax algorithm."""
@@ -52,7 +123,7 @@ class TicTacToeAgent:
         Returns:
             Score for the board position
         """
-        winner = self._check_winner(board)
+        winner = _check_winner(board)
 
         # Terminal states
         if winner == self.agent_player:
@@ -82,26 +153,6 @@ class TicTacToeAgent:
                     board[i] = None
                     min_score = min(score, min_score)
             return min_score
-
-    def _check_winner(self, board):
-        """
-        Check if there's a winner.
-        
-        Returns:
-            'X' if X wins, 'O' if O wins, None if no winner
-        """
-        lines = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8],  # Rows
-            [0, 3, 6], [1, 4, 7], [2, 5, 8],  # Columns
-            [0, 4, 8], [2, 4, 6]  # Diagonals
-        ]
-
-        for line in lines:
-            a, b, c = line
-            if board[a] and board[a] == board[b] == board[c]:
-                return board[a]
-
-        return None
 
     def _is_board_full(self, board):
         """Check if the board is full."""

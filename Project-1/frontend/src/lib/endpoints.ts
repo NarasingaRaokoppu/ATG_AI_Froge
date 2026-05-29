@@ -5,7 +5,10 @@
 
 import { api } from "./api";
 import type {
+  ComplianceRule,
   GeneratedImage,
+  ImageComplianceImageInput,
+  ImageComplianceResponse,
   ImageAspectRatio,
   ImageGenerateRequest,
   ImageGenerateResponse,
@@ -103,4 +106,15 @@ export const spreadsheetApi = {
   }) => api.post<SpreadsheetUploadResponse>("/spreadsheet/google-sheet", payload),
   history: (threadId: string) =>
     api.get<SpreadsheetHistoryItem[]>(`/spreadsheet/history/${threadId}`),
+};
+
+export const imageComplianceApi = {
+  evaluate: (payload: {
+    thread_id?: string | null;
+    rule_set_name: string;
+    rules: ComplianceRule[];
+    images: ImageComplianceImageInput[];
+  }) => api.post<ImageComplianceResponse>("/image-compliance/evaluate", payload),
+  listRuns: (limit = 20) => api.get<Record<string, unknown>[]>(`/image-compliance/runs?limit=${limit}`),
+  getRun: (runId: string) => api.get<Record<string, unknown>>(`/image-compliance/runs/${runId}`),
 };

@@ -10,10 +10,10 @@ const PROJECT_LINKS = [
     description: "Query databases and spreadsheets with natural language.",
   },
   {
-    to: "/spreadsheet-explorer",
+    to: "/image-compliance",
     badge: "Project 9",
-    label: "Spreadsheet Agent",
-    description: "Upload sheets, connect Google Sheets, and stream analysis.",
+    label: "Image Compliance",
+    description: "Extract image fields and validate against custom rule sets.",
   },
   {
     to: "/research-digest",

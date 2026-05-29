@@ -1,0 +1,656 @@
+{
+  "name": "Project13 Daily ChatOps Digest",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        120,
+        240
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0,
+              "weekdays": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "2",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        120,
+        420
+      ],
+      "parameters": {
+        "path": "project13/chatops-digest",
+        "httpMethod": "POST",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "3",
+      "name": "Merge Trigger Input",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        360,
+        320
+      ],
+      "parameters": {
+        "mode": "append"
+      }
+    },
+    {
+      "id": "4",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        580,
+        320
+      ],
+      "parameters": {
+        "jsCode": "const input = $json || {};\nconst lookbackHoursRaw = Number(input.lookback_hours ?? 24);\nconst topNRaw = Number(input.top_n_threads ?? 5);\nconst lookbackHours = Number.isFinite(lookbackHoursRaw) ? Math.min(Math.max(lookbackHoursRaw, 1), 168) : 24;\nconst topN = Number.isFinite(topNRaw) ? Math.min(Math.max(topNRaw, 1), 20) : 5;\nconst runSource = input.run_source === 'webhook' ? 'webhook' : 'cron';\nconst startedAt = new Date().toISOString();\nreturn [{ json: { run_source: runSource, lookback_hours: lookbackHours, top_n_threads: topN, run_started_at: startedAt } }];"
+      }
+    },
+    {
+      "id": "5",
+      "name": "Backend Login",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        810,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_BASE_URL + '/api/auth/login'}}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"email\": $env.BACKEND_SERVICE_EMAIL,\n  \"password\": $env.BACKEND_SERVICE_PASSWORD\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          },
+          "timeout": 30000,
+          "retry": {
+            "enabled": true,
+            "maxTries": 3,
+            "waitBetweenTries": 2000
+          }
+        }
+      }
+    },
+    {
+      "id": "6",
+      "name": "Extract Auth Cookie",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1030,
+        320
+      ],
+      "parameters": {
+        "jsCode": "const headers = $json.headers || {};\nconst setCookie = headers['set-cookie'] || headers['Set-Cookie'];\nif (!setCookie) {\n  throw new Error('Missing auth cookie from backend login response');\n}\nconst cookie = Array.isArray(setCookie) ? setCookie[0] : setCookie;\nreturn [{ json: { ...$item(0).$node['Normalize Input'].json, auth_cookie: cookie } }];"
+      }
+    },
+    {
+      "id": "7",
+      "name": "Get Threads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1250,
+        320
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.BACKEND_BASE_URL + '/api/threads'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Cookie",
+              "value": "={{$json.auth_cookie}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "enabled": true,
+            "maxTries": 3,
+            "waitBetweenTries": 2000
+          }
+        }
+      }
+    },
+    {
+      "id": "8",
+      "name": "Transform Threads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1470,
+        320
+      ],
+      "parameters": {
+        "jsCode": "const ctx = $item(0).$node['Extract Auth Cookie'].json;\nconst threads = Array.isArray($json) ? $json : [];\nconst nowMs = Date.now();\nconst lookbackMs = ctx.lookback_hours * 60 * 60 * 1000;\nconst activeThreads = threads\n  .filter((t) => {\n    const updated = Date.parse(t.updated_at || t.created_at || 0);\n    return Number.isFinite(updated) && (nowMs - updated) <= lookbackMs;\n  })\n  .slice(0, ctx.top_n_threads);\nconst topThreadId = activeThreads.length > 0 ? activeThreads[0].id : null;\nreturn [{ json: { ...ctx, auth_cookie: ctx.auth_cookie, active_threads: activeThreads, active_count: activeThreads.length, top_thread_id: topThreadId } }];"
+      }
+    },
+    {
+      "id": "9",
+      "name": "Has Active Threads",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        320
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.active_count}}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "10",
+      "name": "Get Top Thread Messages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1900,
+        220
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.BACKEND_BASE_URL + '/api/messages/' + $json.top_thread_id}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Cookie",
+              "value": "={{$json.auth_cookie}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "enabled": true,
+            "maxTries": 3,
+            "waitBetweenTries": 2000
+          }
+        }
+      }
+    },
+    {
+      "id": "11",
+      "name": "Build LLM Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2120,
+        220
+      ],
+      "parameters": {
+        "jsCode": "const ctx = $item(0).$node['Transform Threads'].json;\nconst messages = Array.isArray($json) ? $json : [];\nconst transcript = messages\n  .slice(-30)\n  .map((m) => `${m.role || 'unknown'}: ${String(m.content || '').slice(0, 1200)}`)\n  .join('\\n');\nconst prompt = [\n  'Summarize this thread for operations triage.',\n  'Return strict JSON with keys: summary, priority, rationale.',\n  'Priority must be one of: high, normal.',\n  transcript || 'No message content available.'\n].join('\\n\\n');\nreturn [{ json: { ...ctx, transcript, llm_request: { model: $env.LITELLM_MODEL || 'gemini/gemini-2.5-flash', user: $env.WORKFLOW_USER_EMAIL || 'n8n-bot@amzur.com', messages: [{ role: 'system', content: 'You are an operations assistant.' }, { role: 'user', content: prompt }], extra_body: { metadata: { application: 'amzur-ai-chat', environment: 'development' } } } } }];"
+      }
+    },
+    {
+      "id": "12",
+      "name": "LiteLLM Summarize",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2340,
+        220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.LITELLM_PROXY_URL + '/chat/completions'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.LITELLM_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json.llm_request}}",
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "enabled": true,
+            "maxTries": 3,
+            "waitBetweenTries": 2000
+          }
+        }
+      }
+    },
+    {
+      "id": "13",
+      "name": "Parse Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2560,
+        220
+      ],
+      "parameters": {
+        "jsCode": "const ctx = $item(0).$node['Build LLM Payload'].json;\nconst text = $json?.choices?.[0]?.message?.content || '';\nlet parsed = { summary: text, priority: 'normal', rationale: 'default' };\ntry {\n  parsed = JSON.parse(text);\n} catch {\n  parsed = { summary: text, priority: /urgent|critical|sev/i.test(text) ? 'high' : 'normal', rationale: 'heuristic fallback' };\n}\nconst priority = parsed.priority === 'high' ? 'high' : 'normal';\nreturn [{ json: { ...ctx, summary: String(parsed.summary || text || 'No summary generated.'), priority, rationale: String(parsed.rationale || 'n/a') } }];"
+      }
+    },
+    {
+      "id": "14",
+      "name": "High Priority?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2780,
+        220
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.priority}}",
+              "operation": "equals",
+              "value2": "high"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "15",
+      "name": "Slack High Priority Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        3000,
+        140
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": "={{$env.SLACK_CHANNEL_ID}}",
+        "text": "={{'[HIGH] ChatOps Digest: ' + $json.summary}}"
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "replace-slack-credential-id",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "id": "16",
+      "name": "Google Sheets Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3000,
+        300
+      ],
+      "parameters": {
+        "operation": "append",
+        "documentId": "={{$env.GOOGLE_SHEET_ID}}",
+        "sheetName": "DailyDigest",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_started_at": "={{$json.run_started_at}}",
+            "run_source": "={{$json.run_source}}",
+            "priority": "={{$json.priority}}",
+            "summary": "={{$json.summary}}",
+            "thread_id": "={{$json.top_thread_id}}"
+          }
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "replace-gsheets-credential-id",
+          "name": "Google Sheets OAuth"
+        }
+      }
+    },
+    {
+      "id": "17",
+      "name": "Agent Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3220,
+        220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.BACKEND_BASE_URL + '/api/tic-tac-toe/move'}}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"board\": [null, null, null, null, \"X\", null, null, null, null]\n}",
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "enabled": true,
+            "maxTries": 2,
+            "waitBetweenTries": 1000
+          }
+        }
+      }
+    },
+    {
+      "id": "18",
+      "name": "Write Audit Success",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        3440,
+        220
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO n8n_workflow_run_audit (id, workflow_name, run_source, run_started_at, run_finished_at, status, processed_threads, high_priority_threads, summary_text, metadata) VALUES (gen_random_uuid(), 'Project13 Daily ChatOps Digest', '{{$json.run_source}}', '{{$json.run_started_at}}'::timestamptz, NOW(), 'success', {{$json.active_count}}, {{$json.priority === 'high' ? 1 : 0}}, '{{$json.summary}}', '{\"source\":\"n8n\"}'::jsonb);"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "replace-postgres-credential-id",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "id": "19",
+      "name": "No Activity Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1900,
+        430
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": "={{$env.SLACK_CHANNEL_ID}}",
+        "text": "={{'No active chat threads found in the last ' + $json.lookback_hours + ' hours.'}}"
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "replace-slack-credential-id",
+          "name": "Slack Bot"
+        }
+      }
+    },
+    {
+      "id": "20",
+      "name": "Write Audit No Activity",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2120,
+        430
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO n8n_workflow_run_audit (id, workflow_name, run_source, run_started_at, run_finished_at, status, processed_threads, summary_text, metadata) VALUES (gen_random_uuid(), 'Project13 Daily ChatOps Digest', '{{$json.run_source}}', '{{$json.run_started_at}}'::timestamptz, NOW(), 'no_activity', 0, 'No active threads in lookback window.', '{\"source\":\"n8n\"}'::jsonb);"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "replace-postgres-credential-id",
+          "name": "Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Merge Trigger Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Merge Trigger Input",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Trigger Input": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Backend Login",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backend Login": {
+      "main": [
+        [
+          {
+            "node": "Extract Auth Cookie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Auth Cookie": {
+      "main": [
+        [
+          {
+            "node": "Get Threads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Threads": {
+      "main": [
+        [
+          {
+            "node": "Transform Threads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Threads": {
+      "main": [
+        [
+          {
+            "node": "Has Active Threads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Active Threads": {
+      "main": [
+        [
+          {
+            "node": "Get Top Thread Messages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Activity Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Top Thread Messages": {
+      "main": [
+        [
+          {
+            "node": "Build LLM Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LLM Payload": {
+      "main": [
+        [
+          {
+            "node": "LiteLLM Summarize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LiteLLM Summarize": {
+      "main": [
+        [
+          {
+            "node": "Parse Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Summary": {
+      "main": [
+        [
+          {
+            "node": "High Priority?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Priority?": {
+      "main": [
+        [
+          {
+            "node": "Slack High Priority Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Sheets Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack High Priority Alert": {
+      "main": [
+        [
+          {
+            "node": "Agent Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Log": {
+      "main": [
+        [
+          {
+            "node": "Agent Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent Call": {
+      "main": [
+        [
+          {
+            "node": "Write Audit Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Activity Slack": {
+      "main": [
+        [
+          {
+            "node": "Write Audit No Activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "project13-v1"
+}
