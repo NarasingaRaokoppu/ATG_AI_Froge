@@ -1,0 +1,207 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Space+Grotesk:wght@400;500;700&display=swap");
+
+:root {
+  --bg-start: #f8f6f2;
+  --bg-end: #e9f3ff;
+  --ink: #1f2430;
+  --accent: #0f6c5a;
+  --accent-strong: #0a4d40;
+  --card: #ffffffd9;
+  --stroke: #cad6e4;
+  --error: #b42318;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  color: var(--ink);
+  background: radial-gradient(circle at top left, #fff6d8 0%, transparent 45%),
+    radial-gradient(circle at 85% 10%, #d7f3ff 0%, transparent 35%),
+    linear-gradient(160deg, var(--bg-start) 0%, var(--bg-end) 100%);
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 1150px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+}
+
+.hero h1 {
+  font-family: "Fraunces", serif;
+  font-size: clamp(1.8rem, 3.2vw, 3rem);
+  margin-bottom: 0.25rem;
+}
+
+.hero p {
+  margin-top: 0.35rem;
+  max-width: 75ch;
+}
+
+.eyebrow {
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--accent-strong);
+  margin-bottom: 0.2rem;
+}
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--stroke);
+  border-radius: 18px;
+  padding: 1.1rem 1rem;
+  margin-top: 1rem;
+  backdrop-filter: blur(8px);
+}
+
+.controls .grid-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.scenario-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin: 0.6rem 0 0.9rem;
+}
+
+.alt-btn {
+  margin-top: 0;
+  background: #fff;
+  border: 1px solid var(--stroke);
+  color: var(--ink);
+}
+
+.alt-btn:hover {
+  border-color: #8ca2bf;
+}
+
+.helper {
+  margin: 0.4rem 0 0.7rem;
+  color: #3d4b63;
+}
+
+label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 500;
+}
+
+input,
+select,
+button {
+  font: inherit;
+}
+
+input,
+select {
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 0.58rem 0.7rem;
+  background: #fff;
+}
+
+button {
+  margin-top: 0.85rem;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(120deg, var(--accent), #15a98e);
+  color: #fff;
+  font-weight: 700;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.metric-row {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.metric-chip {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.7rem;
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.metric-chip strong {
+  font-size: 0.98rem;
+}
+
+.output-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.45rem;
+}
+
+li {
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 0.55rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.25rem 0.5rem;
+  background: #fff;
+}
+
+li small {
+  grid-column: 1 / -1;
+  color: #44516a;
+}
+
+.content-card {
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.6rem;
+}
+
+.error {
+  color: var(--error);
+  font-weight: 700;
+  margin-top: 0.7rem;
+}
+
+.shell-value .hero h1 {
+  color: #7d4f00;
+}
+
+.shell-premium .hero h1 {
+  color: #3a2a60;
+}
+
+.shell-considering .hero h1 {
+  color: #0f355e;
+}
+
+@media (max-width: 900px) {
+  .controls .grid-two,
+  .scenario-row,
+  .metric-row,
+  .output-grid {
+    grid-template-columns: 1fr;
+  }
+}

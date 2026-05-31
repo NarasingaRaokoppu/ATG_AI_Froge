@@ -1,0 +1,26 @@
+graph TD
+  U[User Session] --> FE[Demo Web UI]
+  FE --> ORCH[/POST /api/v1/personalization/decide/]
+  FE --> EVT[/POST /api/v1/events/]
+
+  EVT --> BTA[Behavior Tracking Service]
+  BTA --> DB[(Supabase)]
+
+  ORCH --> SEG[Segmentation Service]
+  ORCH --> REC[Recommendation Service]
+  ORCH --> PRC[Dynamic Pricing Service]
+  ORCH --> CNT[Content Personalization Service]
+
+  SEG --> DB
+  REC --> DB
+  PRC --> DB
+  CNT --> DB
+
+  ORCH --> TRACE[Decision Trace Writer]
+  TRACE --> DB
+
+  DB --> PROFILE[/GET /api/v1/users/{user_id}/profile/]
+  DB --> TRACES[/GET /api/v1/traces/{trace_id}/]
+
+  PROFILE --> FE
+  TRACES --> FE
